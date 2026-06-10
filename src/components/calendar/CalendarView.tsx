@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   addDays,
   addMonths,
   addWeeks,
+  parseISO,
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
@@ -122,6 +123,16 @@ export default function CalendarView() {
   const t = useT()
   const locale = useDateLocale()
   const language = useStore((s) => s.language)
+  const calendarJumpDate = useStore((s) => s.calendarJumpDate)
+  const setCalendarJumpDate = useStore((s) => s.setCalendarJumpDate)
+
+  // Jump requested from search results.
+  useEffect(() => {
+    if (calendarJumpDate) {
+      setCursor(parseISO(calendarJumpDate))
+      setCalendarJumpDate(null)
+    }
+  }, [calendarJumpDate, setCalendarJumpDate])
 
   const days = useMemo(() => {
     if (mode === 'month') {

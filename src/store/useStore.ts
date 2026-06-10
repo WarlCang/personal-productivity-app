@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { format } from 'date-fns'
 import type {
+  Board,
   CalendarEvent,
   Column,
   FocusSession,
@@ -15,10 +16,14 @@ import { uid } from '../utils/id'
 import { playChime } from '../utils/sound'
 import { translate, type Lang } from '../i18n/dict'
 
+const MAIN_BOARD_ID = 'board-main'
+
+const DEFAULT_BOARDS: Board[] = [{ id: MAIN_BOARD_ID, title: 'Main' }]
+
 const DEFAULT_COLUMNS: Column[] = [
-  { id: 'col-todo', title: 'To Do', order: 0 },
-  { id: 'col-progress', title: 'In Progress', order: 1 },
-  { id: 'col-done', title: 'Done', order: 2, isDoneColumn: true },
+  { id: 'col-todo', title: 'To Do', order: 0, boardId: MAIN_BOARD_ID },
+  { id: 'col-progress', title: 'In Progress', order: 1, boardId: MAIN_BOARD_ID },
+  { id: 'col-done', title: 'Done', order: 2, boardId: MAIN_BOARD_ID, isDoneColumn: true },
 ]
 
 const DEFAULT_POMODORO: PomodoroSettings = {
@@ -40,6 +45,12 @@ interface Store {
 
   tasks: Task[]
   columns: Column[]
+  boards: Board[]
+  activeBoardId: string
+  setActiveBoard: (id: string) => void
+  addBoard: (title: string) => void
+  renameBoard: (id: string, title: string) => void
+  deleteBoard: (id: string) => void
   addTask: (partial: Partial<Task> & { title: string }) => Task
   updateTask: (id: string, patch: Partial<Task>) => void
   deleteTask: (id: string) => void
@@ -50,7 +61,8 @@ interface Store {
   renameColumn: (id: string, title: string) => void
   deleteColumn: (id: string) => void
   moveColumn: (id: string, direction: -1 | 1) => void
-  applyBoardTemplate: (columns: { title: string; isDoneColumn?: boolean }[]) => void
+  /** Creates a NEW board from a template and switches to it. */
+  applyBoardTemplate: (title: string, columns: { title: string; isDoneColumn?: boolean }[]) => void
 
   events: CalendarEvent[]
   addEvent: (partial: Omit<CalendarEvent, 'id'>) => void
@@ -58,6 +70,8 @@ interface Store {
   deleteEvent: (id: string) => void
 
   notes: Note[]
+  selectedNoteId: string | null
+  setSelectedNote: (id: string | null) => void
   addNote: (partial?: { title?: string; content?: string; folder?: string }) => Note
   updateNote: (id: string, patch: Partial<Note>) => void
   deleteNote: (id: string) => void
@@ -85,6 +99,14 @@ interface Store {
 
   gameHighScore: number
   setGameHighScore: (score: number) => void
+
+  /** When set, CalendarView jumps to this date and clears it. */
+  calendarJumpDate: string | null
+  setCalendarJumpDate: (date: string | null) => void
+
+  /** yyyy-MM-dd of the last day a due-task notification was sent. */
+  lastDueReminderDate: string | null
+  markDueReminderSent: (date: string) => void
 }
 
 function notifyPhaseEnd(settings: PomodoroSettings, finished: PomodoroPhase, lang: Lang) {
@@ -115,10 +137,49 @@ export const useStore = create<Store>()(
 
       tasks: [],
       columns: DEFAULT_COLUMNS,
+      boards: DEFAULT_BOARDS,
+      activeBoardId: MAIN_BOARD_ID,
+
+      setActiveBoard: (id) => set({ activeBoardId: id }),
+
+      addBoard: (title) => {
+        const board: Board = { id: uid(), title }
+        const columns: Column[] = [
+          { id: uid(), title: 'To Do', order: 0, boardId: board.id },
+          { id: uid(), title: 'In Progress', order: 1, boardId: board.id },
+          { id: uid(), title: 'Done', order: 2, boardId: board.id, isDoneColumn: true },
+        ]
+        set({ boards: [...get().boards, board], columns: [...get().columns, ...columns], activeBoardId: board.id })
+      },
+
+      renameBoard: (id, title) =>
+        set({ boards: get().boards.map((b) => (b.id === id ? { ...b, title } : b)) }),
+
+      deleteBoard: (id) => {
+        const { boards, columns, tasks } = get()
+        if (boards.length <= 1) return
+        const remaining = boards.filter((b) => b.id !== id)
+        const removedColumnIds = new Set(columns.filter((c) => c.boardId === id).map((c) => c.id))
+        const fallbackBoard = remaining[0]
+        const fallbackCols = columns
+          .filter((c) => c.boardId === fallbackBoard.id)
+          .sort((a, b) => a.order - b.order)
+        const firstCol = fallbackCols.find((c) => !c.isDoneColumn) ?? fallbackCols[0]
+        const doneCol = fallbackCols.find((c) => c.isDoneColumn) ?? fallbackCols[fallbackCols.length - 1]
+        set({
+          boards: remaining,
+          activeBoardId: get().activeBoardId === id ? fallbackBoard.id : get().activeBoardId,
+          columns: columns.filter((c) => c.boardId !== id),
+          tasks: tasks.map((t) =>
+            removedColumnIds.has(t.columnId) ? { ...t, columnId: t.done ? doneCol.id : firstCol.id } : t,
+          ),
+        })
+      },
 
       addTask: (partial) => {
-        const columns = get().columns
-        const firstCol = [...columns].sort((a, b) => a.order - b.order).find((c) => !c.isDoneColumn) ?? columns[0]
+        const { columns, activeBoardId } = get()
+        const boardCols = columns.filter((c) => c.boardId === activeBoardId)
+        const firstCol = [...boardCols].sort((a, b) => a.order - b.order).find((c) => !c.isDoneColumn) ?? boardCols[0]
         const columnId = partial.columnId ?? firstCol.id
         const order = Math.max(-1, ...get().tasks.filter((t) => t.columnId === columnId).map((t) => t.order)) + 1
         const task: Task = {
@@ -148,8 +209,11 @@ export const useStore = create<Store>()(
         const task = tasks.find((t) => t.id === id)
         if (!task) return
         const done = !task.done
-        const doneCol = columns.find((c) => c.isDoneColumn)
-        const firstCol = [...columns].sort((a, b) => a.order - b.order).find((c) => !c.isDoneColumn)
+        // Stay within the task's own board.
+        const boardId = columns.find((c) => c.id === task.columnId)?.boardId
+        const boardCols = columns.filter((c) => c.boardId === boardId)
+        const doneCol = boardCols.find((c) => c.isDoneColumn)
+        const firstCol = [...boardCols].sort((a, b) => a.order - b.order).find((c) => !c.isDoneColumn)
         let columnId = task.columnId
         if (done && doneCol) columnId = doneCol.id
         else if (!done && doneCol && task.columnId === doneCol.id && firstCol) columnId = firstCol.id
@@ -183,8 +247,10 @@ export const useStore = create<Store>()(
       setTasks: (tasks) => set({ tasks }),
 
       addColumn: (title) => {
-        const order = Math.max(-1, ...get().columns.map((c) => c.order)) + 1
-        set({ columns: [...get().columns, { id: uid(), title, order }] })
+        const { columns, activeBoardId } = get()
+        const boardCols = columns.filter((c) => c.boardId === activeBoardId)
+        const order = Math.max(-1, ...boardCols.map((c) => c.order)) + 1
+        set({ columns: [...columns, { id: uid(), title, order, boardId: activeBoardId }] })
       },
 
       renameColumn: (id, title) =>
@@ -192,41 +258,44 @@ export const useStore = create<Store>()(
 
       deleteColumn: (id) => {
         const { columns, tasks } = get()
-        if (columns.length <= 1) return
-        const remaining = columns.filter((c) => c.id !== id)
-        const fallback = [...remaining].sort((a, b) => a.order - b.order)[0]
+        const column = columns.find((c) => c.id === id)
+        if (!column) return
+        const boardCols = columns.filter((c) => c.boardId === column.boardId)
+        if (boardCols.length <= 1) return
+        const fallback = [...boardCols].filter((c) => c.id !== id).sort((a, b) => a.order - b.order)[0]
         set({
-          columns: remaining,
+          columns: columns.filter((c) => c.id !== id),
           tasks: tasks.map((t) => (t.columnId === id ? { ...t, columnId: fallback.id } : t)),
         })
       },
 
-      applyBoardTemplate: (templateColumns) => {
+      applyBoardTemplate: (title, templateColumns) => {
+        const board: Board = { id: uid(), title }
         const columns: Column[] = templateColumns.map((c, i) => ({
           id: uid(),
           title: c.title,
           order: i,
+          boardId: board.id,
           isDoneColumn: c.isDoneColumn,
         }))
-        const firstCol = columns.find((c) => !c.isDoneColumn) ?? columns[0]
-        const doneCol = columns.find((c) => c.isDoneColumn) ?? columns[columns.length - 1]
         set({
-          columns,
-          tasks: get().tasks.map((t, i) => ({
-            ...t,
-            columnId: t.done ? doneCol.id : firstCol.id,
-            order: i,
-          })),
+          boards: [...get().boards, board],
+          columns: [...get().columns, ...columns],
+          activeBoardId: board.id,
         })
       },
 
       moveColumn: (id, direction) => {
-        const sorted = [...get().columns].sort((a, b) => a.order - b.order)
+        const { columns } = get()
+        const column = columns.find((c) => c.id === id)
+        if (!column) return
+        const sorted = columns.filter((c) => c.boardId === column.boardId).sort((a, b) => a.order - b.order)
         const index = sorted.findIndex((c) => c.id === id)
         const swapWith = index + direction
         if (index < 0 || swapWith < 0 || swapWith >= sorted.length) return
         ;[sorted[index], sorted[swapWith]] = [sorted[swapWith], sorted[index]]
-        set({ columns: sorted.map((c, i) => ({ ...c, order: i })) })
+        const orderById = new Map(sorted.map((c, i) => [c.id, i]))
+        set({ columns: columns.map((c) => (orderById.has(c.id) ? { ...c, order: orderById.get(c.id)! } : c)) })
       },
 
       events: [],
@@ -236,6 +305,8 @@ export const useStore = create<Store>()(
       deleteEvent: (id) => set({ events: get().events.filter((e) => e.id !== id) }),
 
       notes: [],
+      selectedNoteId: null,
+      setSelectedNote: (id) => set({ selectedNoteId: id }),
       addNote: (partial = {}) => {
         const now = new Date().toISOString()
         const note: Note = {
@@ -246,7 +317,7 @@ export const useStore = create<Store>()(
           createdAt: now,
           updatedAt: now,
         }
-        set({ notes: [note, ...get().notes] })
+        set({ notes: [note, ...get().notes], selectedNoteId: note.id })
         return note
       },
       updateNote: (id, patch) =>
@@ -368,10 +439,28 @@ export const useStore = create<Store>()(
 
       gameHighScore: 0,
       setGameHighScore: (score) => set({ gameHighScore: Math.max(score, get().gameHighScore) }),
+
+      calendarJumpDate: null,
+      setCalendarJumpDate: (date) => set({ calendarJumpDate: date }),
+
+      lastDueReminderDate: null,
+      markDueReminderSent: (date) => set({ lastDueReminderDate: date }),
     }),
     {
       name: 'torras-productivity',
-      version: 1,
+      version: 2,
+      migrate: (persisted, version) => {
+        const state = persisted as Record<string, unknown>
+        if (version < 2) {
+          // v1 had a single implicit board; attach existing columns to it.
+          state.boards = DEFAULT_BOARDS
+          state.activeBoardId = MAIN_BOARD_ID
+          if (Array.isArray(state.columns)) {
+            state.columns = (state.columns as Column[]).map((c) => ({ ...c, boardId: MAIN_BOARD_ID }))
+          }
+        }
+        return state
+      },
     },
   ),
 )

@@ -23,8 +23,10 @@ Then open http://localhost:5173.
 
 ## Features
 
+- **Home dashboard** — greeting with today's work-calendar status, quick-add, open-task and focus-time stat cards, next promo countdowns, due & overdue tasks, and today's schedule.
 - **Todos** — quick-add tasks with optional priority, tags, subtasks, and due dates. Filter by tag, sort by date/priority.
-- **Kanban** — the same tasks on a drag-and-drop board. Columns are customizable; dropping a card into *Done* completes the task (and vice versa).
+- **Kanban** — multiple boards with a tab switcher (double-click a tab to rename). Columns are customizable; dropping a card into *Done* completes the task (and vice versa). Templates create new boards.
+- **Keyboard shortcuts** — `1–7` switch views, `n` quick-adds a task from anywhere, `/` opens universal search across tasks, notes, and events. Due/overdue tasks show a count in the tab title and trigger one notification per day (when notifications are enabled).
 - **Calendar** — month and week views. Tasks with due dates appear automatically; standalone events support start/end times and daily/weekly/monthly recurrence. Follows the Chinese work calendar: statutory holidays are marked 休 and weekend makeup workdays (调休) are marked 班, per the State Council's annual notice (2026 data from 国办发明电〔2025〕7号; see `src/utils/chinaWorkCalendar.ts` for sources and how to add future years).
 - **Notes** — Notion-style rich text editor (TipTap) with folders, search, and checklists.
 - **Pomodoro** — configurable focus/break cycles with long breaks, sound + browser notifications, per-day focus stats, and optional task linking ("Focus on this" from any task).

@@ -14,7 +14,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities'
 import { useDroppable } from '@dnd-kit/core'
 import { format, parseISO } from 'date-fns'
-import { ArrowLeft, ArrowRight, LayoutTemplate, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, LayoutTemplate, ListChecks, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { useT } from '../../i18n'
 import { BOARD_TEMPLATES, tagChipClass, templateColumns } from '../../utils/torrasPresets'
@@ -175,15 +175,27 @@ export default function KanbanView() {
   const addColumn = useStore((s) => s.addColumn)
   const applyBoardTemplate = useStore((s) => s.applyBoardTemplate)
   const language = useStore((s) => s.language)
+  const boards = useStore((s) => s.boards)
+  const activeBoardId = useStore((s) => s.activeBoardId)
+  const setActiveBoard = useStore((s) => s.setActiveBoard)
+  const addBoard = useStore((s) => s.addBoard)
+  const renameBoard = useStore((s) => s.renameBoard)
+  const deleteBoard = useStore((s) => s.deleteBoard)
   const t = useT()
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [showTemplates, setShowTemplates] = useState(false)
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const [addingColumn, setAddingColumn] = useState(false)
   const [columnTitle, setColumnTitle] = useState('')
+  const [addingBoard, setAddingBoard] = useState(false)
+  const [boardTitle, setBoardTitle] = useState('')
+  const [renamingBoardId, setRenamingBoardId] = useState<string | null>(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
-  const sortedColumns = useMemo(() => [...columns].sort((a, b) => a.order - b.order), [columns])
+  const sortedColumns = useMemo(
+    () => columns.filter((c) => c.boardId === activeBoardId).sort((a, b) => a.order - b.order),
+    [columns, activeBoardId],
+  )
   const byColumn = useMemo(() => {
     const map = new Map<string, Task[]>()
     for (const col of columns) map.set(col.id, [])
@@ -241,14 +253,14 @@ export default function KanbanView() {
           </button>
           {showTemplates && (
             <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-ink-700 bg-ink-850 p-1 shadow-xl shadow-black/40">
+              <div className="px-3 py-1 text-[11px] text-ink-400">{t('kanban.templatesHint')}</div>
               {BOARD_TEMPLATES.map((template) => (
                 <button
                   key={template.nameKey}
                   className="block w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-ink-200 transition-colors hover:bg-ink-800"
                   onClick={() => {
                     setShowTemplates(false)
-                    if (confirm(t('kanban.applyTemplateConfirm', { name: t(template.nameKey) })))
-                      applyBoardTemplate(templateColumns(template, language))
+                    applyBoardTemplate(t(template.nameKey), templateColumns(template, language))
                   }}
                 >
                   <div className="font-medium">{t(template.nameKey)}</div>
@@ -262,6 +274,77 @@ export default function KanbanView() {
         </div>
       </div>
 
+      <div className="mt-4 flex flex-wrap items-center gap-1.5">
+        {boards.map((board) => {
+          const active = board.id === activeBoardId
+          const boardTaskCount = tasks.filter((task) =>
+            columns.some((c) => c.id === task.columnId && c.boardId === board.id && !task.done),
+          ).length
+          return renamingBoardId === board.id ? (
+            <input
+              key={board.id}
+              autoFocus
+              className="input w-40 py-1 text-sm"
+              defaultValue={board.title}
+              onBlur={(e) => {
+                if (e.target.value.trim()) renameBoard(board.id, e.target.value.trim())
+                setRenamingBoardId(null)
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+            />
+          ) : (
+            <span
+              key={board.id}
+              className={`group flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                active ? 'bg-brand-500/15 text-brand-400' : 'text-ink-300 hover:bg-ink-800 hover:text-ink-100'
+              }`}
+              onClick={() => setActiveBoard(board.id)}
+              onDoubleClick={() => setRenamingBoardId(board.id)}
+            >
+              {board.title}
+              <span className="text-[11px] text-ink-400">{boardTaskCount}</span>
+              {active && boards.length > 1 && (
+                <button
+                  className="hidden cursor-pointer text-ink-400 group-hover:inline hover:text-red-400"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const n = tasks.filter((task) =>
+                      columns.some((c) => c.id === task.columnId && c.boardId === board.id),
+                    ).length
+                    if (n === 0 || confirm(t('kanban.deleteBoardConfirm', { title: board.title, n })))
+                      deleteBoard(board.id)
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </span>
+          )
+        })}
+        {addingBoard ? (
+          <input
+            autoFocus
+            className="input w-40 py-1 text-sm"
+            placeholder={t('kanban.boardPlaceholder')}
+            value={boardTitle}
+            onChange={(e) => setBoardTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && boardTitle.trim()) {
+                addBoard(boardTitle.trim())
+                setBoardTitle('')
+                setAddingBoard(false)
+              }
+              if (e.key === 'Escape') setAddingBoard(false)
+            }}
+            onBlur={() => setAddingBoard(false)}
+          />
+        ) : (
+          <button className="btn-ghost text-xs" onClick={() => setAddingBoard(true)}>
+            <Plus size={13} /> {t('kanban.addBoard')}
+          </button>
+        )}
+      </div>
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -270,7 +353,7 @@ export default function KanbanView() {
         onDragEnd={onDragEnd}
         onDragCancel={() => setActiveTask(null)}
       >
-        <div className="mt-5 flex flex-1 items-start gap-4 overflow-x-auto pb-4">
+        <div className="mt-4 flex flex-1 items-start gap-4 overflow-x-auto pb-4">
           {sortedColumns.map((col) => (
             <BoardColumn key={col.id} column={col} tasks={byColumn.get(col.id) ?? []} onOpenTask={setOpenTaskId} />
           ))}

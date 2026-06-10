@@ -2,6 +2,7 @@ import {
   CalendarDays,
   CheckSquare,
   Gamepad2,
+  House,
   Kanban,
   Languages,
   ListTodo,
@@ -14,6 +15,7 @@ import { useT, type TKey } from '../i18n'
 import type { ViewName } from '../types'
 
 const NAV: { view: ViewName; labelKey: TKey; icon: typeof ListTodo }[] = [
+  { view: 'home', labelKey: 'nav.home', icon: House },
   { view: 'todos', labelKey: 'nav.todos', icon: ListTodo },
   { view: 'kanban', labelKey: 'nav.kanban', icon: Kanban },
   { view: 'calendar', labelKey: 'nav.calendar', icon: CalendarDays },

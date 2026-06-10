@@ -21,10 +21,16 @@ export interface Task {
   order: number
 }
 
+export interface Board {
+  id: string
+  title: string
+}
+
 export interface Column {
   id: string
   title: string
   order: number
+  boardId: string
   isDoneColumn?: boolean
 }
 
@@ -75,4 +81,4 @@ export interface FocusSession {
   completedAt: string
 }
 
-export type ViewName = 'todos' | 'kanban' | 'calendar' | 'notes' | 'pomodoro' | 'game'
+export type ViewName = 'home' | 'todos' | 'kanban' | 'calendar' | 'notes' | 'pomodoro' | 'game'

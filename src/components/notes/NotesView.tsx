@@ -17,8 +17,9 @@ export default function NotesView() {
   const addNote = useStore((s) => s.addNote)
   const deleteNote = useStore((s) => s.deleteNote)
   const language = useStore((s) => s.language)
+  const selectedId = useStore((s) => s.selectedNoteId)
+  const setSelectedId = useStore((s) => s.setSelectedNote)
   const t = useT()
-  const [selectedId, setSelectedId] = useState<string | null>(notes[0]?.id ?? null)
   const [query, setQuery] = useState('')
   const [folderFilter, setFolderFilter] = useState('')
   const [showTemplates, setShowTemplates] = useState(false)
@@ -50,6 +51,7 @@ export default function NotesView() {
     setShowTemplates(false)
     setSelectedId(note.id)
   }
+
 
   return (
     <div className="flex h-full">

@@ -2,6 +2,7 @@ export type Lang = 'en' | 'zh'
 
 const en = {
   // Sidebar
+  'nav.home': 'Home',
   'nav.todos': 'Todos',
   'nav.kanban': 'Kanban',
   'nav.calendar': 'Calendar',
@@ -52,8 +53,11 @@ const en = {
   'kanban.columnPlaceholder': 'Column name…',
   'kanban.deleteColumnConfirm': 'Delete "{title}"? Its {n} task(s) move to the first column.',
   'kanban.templates': 'Templates',
-  'kanban.applyTemplateConfirm':
-    'Apply the "{name}" board layout? Current columns are replaced; existing tasks move to the first column (done tasks to the last).',
+  'kanban.templatesHint': 'Creates a new board',
+  'kanban.addBoard': 'New board',
+  'kanban.boardPlaceholder': 'Board name…',
+  'kanban.deleteBoardConfirm': 'Delete board "{title}"? Its {n} task(s) move to your first board.',
+  'kanban.defaultBoard': 'Main',
   'kanban.template.launch': 'Product Launch',
   'kanban.template.campaign': 'Marketing Campaign',
   'kanban.template.listing': 'Listing Optimization',
@@ -152,6 +156,35 @@ const en = {
   'pomodoro.notifFocusDone': 'Focus session complete — time for a break. The game is unlocked!',
   'pomodoro.notifBreakDone': 'Break is over — back to focus.',
 
+  // Home
+  'home.goodMorning': 'Good morning',
+  'home.goodAfternoon': 'Good afternoon',
+  'home.goodEvening': 'Good evening',
+  'home.dueTasks': 'Due & overdue',
+  'home.allClear': 'Nothing due — nice.',
+  'home.todaySchedule': "Today's schedule",
+  'home.noEvents': 'No events today',
+  'home.focusToday': 'Focus today',
+  'home.sessions': '{n} sessions · {m} min',
+  'home.openTasks': '{n} open tasks',
+  'home.quickAdd': 'Add a task — press Enter',
+  'home.workday': 'Regular workday',
+  'home.restDay': 'Rest day',
+  'home.holidayToday': '{name} holiday — enjoy the day off!',
+  'home.makeupToday': 'Makeup workday (调休) for {name}',
+  'home.shortcutHint': 'Press 1–7 to switch views, n to quick-add, / to search',
+
+  // Search & quick add
+  'search.placeholder': 'Search tasks, notes, events…',
+  'search.tasks': 'Tasks',
+  'search.notes': 'Notes',
+  'search.events': 'Events',
+  'search.noResults': 'No results',
+  'quickadd.placeholder': 'Quick add task — Enter to save, Esc to close',
+
+  // Reminders
+  'reminder.dueToday': '{n} task(s) due or overdue today',
+
   // Game
   'game.title': 'Drop Defense',
   'game.lockedTitle': 'Drop Defense is locked',
@@ -173,6 +206,7 @@ const en = {
 type TKey = keyof typeof en
 
 const zh: Record<TKey, string> = {
+  'nav.home': '首页',
   'nav.todos': '待办',
   'nav.kanban': '看板',
   'nav.calendar': '日历',
@@ -220,7 +254,11 @@ const zh: Record<TKey, string> = {
   'kanban.columnPlaceholder': '列名称…',
   'kanban.deleteColumnConfirm': '删除"{title}"？其中 {n} 个任务将移到第一列。',
   'kanban.templates': '模板',
-  'kanban.applyTemplateConfirm': '应用"{name}"看板模板？当前列将被替换；现有任务移到第一列（已完成任务移到最后一列）。',
+  'kanban.templatesHint': '将创建一个新看板',
+  'kanban.addBoard': '新建看板',
+  'kanban.boardPlaceholder': '看板名称…',
+  'kanban.deleteBoardConfirm': '删除看板"{title}"？其中 {n} 个任务将移到第一个看板。',
+  'kanban.defaultBoard': '主看板',
   'kanban.template.launch': '产品上市',
   'kanban.template.campaign': '营销活动',
   'kanban.template.listing': 'Listing 优化',
@@ -313,6 +351,32 @@ const zh: Record<TKey, string> = {
   'pomodoro.notifUnsupported': '当前浏览器不支持通知。',
   'pomodoro.notifFocusDone': '专注结束 — 休息一下，游戏已解锁！',
   'pomodoro.notifBreakDone': '休息结束 — 回到专注。',
+
+  'home.goodMorning': '早上好',
+  'home.goodAfternoon': '下午好',
+  'home.goodEvening': '晚上好',
+  'home.dueTasks': '今日到期与逾期',
+  'home.allClear': '没有到期任务，棒！',
+  'home.todaySchedule': '今日日程',
+  'home.noEvents': '今天没有日程',
+  'home.focusToday': '今日专注',
+  'home.sessions': '{n} 个番茄钟 · {m} 分钟',
+  'home.openTasks': '{n} 项进行中',
+  'home.quickAdd': '添加任务 — 按回车确认',
+  'home.workday': '正常工作日',
+  'home.restDay': '休息日',
+  'home.holidayToday': '{name}假期 — 好好休息！',
+  'home.makeupToday': '{name}调休 — 今天上班',
+  'home.shortcutHint': '按 1–7 切换视图，n 快速添加，/ 搜索',
+
+  'search.placeholder': '搜索任务、笔记、日程…',
+  'search.tasks': '任务',
+  'search.notes': '笔记',
+  'search.events': '日程',
+  'search.noResults': '无结果',
+  'quickadd.placeholder': '快速添加任务 — 回车保存，Esc 关闭',
+
+  'reminder.dueToday': '今天有 {n} 项任务到期或逾期',
 
   'game.title': '接机大作战',
   'game.lockedTitle': '接机大作战已锁定',
