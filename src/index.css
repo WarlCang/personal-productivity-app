@@ -1,0 +1,135 @@
+@import 'tailwindcss';
+
+@theme {
+  /* TORRAS brand palette: deep black with orange accent */
+  --color-ink-950: #0a0a0b;
+  --color-ink-900: #111113;
+  --color-ink-850: #17171a;
+  --color-ink-800: #1d1d21;
+  --color-ink-700: #2a2a30;
+  --color-ink-600: #3a3a42;
+  --color-ink-400: #6b6b76;
+  --color-ink-300: #94949f;
+  --color-ink-200: #c2c2cb;
+  --color-ink-100: #e8e8ec;
+
+  --color-brand-300: #ffb066;
+  --color-brand-400: #ff9440;
+  --color-brand-500: #ff7a1a;
+  --color-brand-600: #f06400;
+  --color-brand-700: #c75300;
+
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-ink-950 text-ink-100 antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-ink-700);
+  border-radius: 5px;
+  border: 2px solid var(--color-ink-950);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- Shared primitives ---------- */
+
+@utility btn {
+  @apply inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer select-none;
+}
+.btn-primary {
+  @apply btn bg-brand-500 text-ink-950 hover:bg-brand-400;
+}
+.btn-ghost {
+  @apply btn text-ink-300 hover:bg-ink-800 hover:text-ink-100;
+}
+.btn-danger {
+  @apply btn text-red-400 hover:bg-red-500/10;
+}
+
+.input {
+  @apply w-full rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-ink-100 placeholder-ink-400 outline-none transition-colors focus:border-brand-500;
+}
+
+.card {
+  @apply rounded-xl border border-ink-800 bg-ink-900;
+}
+
+.modal-backdrop {
+  @apply fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-[8vh] backdrop-blur-sm;
+}
+
+.chip {
+  @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+}
+
+/* ---------- TipTap editor ---------- */
+
+.tiptap {
+  @apply min-h-[50vh] outline-none text-[15px] leading-relaxed;
+}
+.tiptap p {
+  @apply my-1.5;
+}
+.tiptap h1 {
+  @apply mt-5 mb-2 text-3xl font-bold text-white;
+}
+.tiptap h2 {
+  @apply mt-4 mb-2 text-2xl font-semibold text-white;
+}
+.tiptap h3 {
+  @apply mt-3 mb-1.5 text-xl font-semibold text-white;
+}
+.tiptap ul {
+  @apply my-1.5 list-disc pl-6;
+}
+.tiptap ol {
+  @apply my-1.5 list-decimal pl-6;
+}
+.tiptap blockquote {
+  @apply my-2 border-l-2 border-brand-500 pl-4 text-ink-300 italic;
+}
+.tiptap code {
+  @apply rounded bg-ink-800 px-1.5 py-0.5 font-mono text-[13px] text-brand-300;
+}
+.tiptap pre {
+  @apply my-2 overflow-x-auto rounded-lg bg-ink-850 p-3;
+}
+.tiptap pre code {
+  @apply bg-transparent p-0 text-ink-200;
+}
+.tiptap hr {
+  @apply my-4 border-ink-700;
+}
+.tiptap a {
+  @apply text-brand-400 underline;
+}
+.tiptap ul[data-type='taskList'] {
+  @apply list-none pl-1;
+}
+.tiptap ul[data-type='taskList'] li {
+  @apply flex items-start gap-2;
+}
+.tiptap ul[data-type='taskList'] li > label {
+  @apply mt-1;
+}
+.tiptap ul[data-type='taskList'] input[type='checkbox'] {
+  accent-color: var(--color-brand-500);
+}
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply pointer-events-none float-left h-0 text-ink-400;
+}

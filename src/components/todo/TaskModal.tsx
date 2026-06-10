@@ -1,0 +1,191 @@
+import { useState } from 'react'
+import { Flag, Play, Plus, Tag, Trash2, X } from 'lucide-react'
+import { useStore } from '../../store/useStore'
+import type { Priority, Task } from '../../types'
+import { uid } from '../../utils/id'
+
+export const PRIORITY_STYLES: Record<Priority, { label: string; chip: string }> = {
+  high: { label: 'High', chip: 'bg-red-500/15 text-red-400' },
+  medium: { label: 'Medium', chip: 'bg-brand-500/15 text-brand-400' },
+  low: { label: 'Low', chip: 'bg-sky-500/15 text-sky-400' },
+}
+
+export default function TaskModal({ taskId, onClose }: { taskId: string; onClose: () => void }) {
+  const task = useStore((s) => s.tasks.find((t) => t.id === taskId))
+  const updateTask = useStore((s) => s.updateTask)
+  const deleteTask = useStore((s) => s.deleteTask)
+  const toggleTaskDone = useStore((s) => s.toggleTaskDone)
+  const startPomodoro = useStore((s) => s.startPomodoro)
+  const setView = useStore((s) => s.setView)
+  const [newSubtask, setNewSubtask] = useState('')
+  const [newTag, setNewTag] = useState('')
+
+  if (!task) return null
+
+  const patch = (p: Partial<Task>) => updateTask(task.id, p)
+
+  const addSubtask = () => {
+    const title = newSubtask.trim()
+    if (!title) return
+    patch({ subtasks: [...task.subtasks, { id: uid(), title, done: false }] })
+    setNewSubtask('')
+  }
+
+  const addTag = () => {
+    const tag = newTag.trim().toLowerCase()
+    if (!tag || task.tags.includes(tag)) return setNewTag('')
+    patch({ tags: [...task.tags, tag] })
+    setNewTag('')
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="card w-full max-w-lg p-5">
+        <div className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={task.done}
+            onChange={() => toggleTaskDone(task.id)}
+            className="mt-2 h-4 w-4 cursor-pointer accent-brand-500"
+          />
+          <input
+            className="flex-1 bg-transparent text-lg font-semibold text-white outline-none placeholder-ink-400"
+            value={task.title}
+            placeholder="Task title"
+            onChange={(e) => patch({ title: e.target.value })}
+          />
+          <button className="btn-ghost -mr-1 px-2" onClick={onClose}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <textarea
+          className="input mt-3 min-h-20 resize-y"
+          placeholder="Description…"
+          value={task.description ?? ''}
+          onChange={(e) => patch({ description: e.target.value })}
+        />
+
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <label className="text-xs text-ink-400">
+            Due date
+            <input
+              type="date"
+              className="input mt-1 [color-scheme:dark]"
+              value={task.dueDate ?? ''}
+              onChange={(e) => patch({ dueDate: e.target.value || undefined })}
+            />
+          </label>
+          <label className="text-xs text-ink-400">
+            Priority
+            <select
+              className="input mt-1 cursor-pointer"
+              value={task.priority ?? ''}
+              onChange={(e) => patch({ priority: (e.target.value || undefined) as Priority | undefined })}
+            >
+              <option value="">None</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-4">
+          <div className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-400">
+            <Tag size={12} /> Tags
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {task.tags.map((tag) => (
+              <span key={tag} className="chip bg-ink-800 text-ink-200">
+                #{tag}
+                <button
+                  className="cursor-pointer text-ink-400 hover:text-red-400"
+                  onClick={() => patch({ tags: task.tags.filter((t) => t !== tag) })}
+                >
+                  <X size={11} />
+                </button>
+              </span>
+            ))}
+            <input
+              className="w-28 rounded-full border border-ink-700 bg-transparent px-2.5 py-0.5 text-xs outline-none placeholder-ink-400 focus:border-brand-500"
+              placeholder="Add tag…"
+              value={newTag}
+              onChange={(e) => setNewTag(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addTag()}
+              onBlur={addTag}
+            />
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <div className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-400">
+            <Flag size={12} /> Subtasks
+            {task.subtasks.length > 0 && (
+              <span>
+                ({task.subtasks.filter((s) => s.done).length}/{task.subtasks.length})
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            {task.subtasks.map((sub) => (
+              <div key={sub.id} className="group flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-ink-850">
+                <input
+                  type="checkbox"
+                  checked={sub.done}
+                  onChange={() =>
+                    patch({
+                      subtasks: task.subtasks.map((s) => (s.id === sub.id ? { ...s, done: !s.done } : s)),
+                    })
+                  }
+                  className="h-3.5 w-3.5 cursor-pointer accent-brand-500"
+                />
+                <span className={`flex-1 text-sm ${sub.done ? 'text-ink-400 line-through' : 'text-ink-200'}`}>
+                  {sub.title}
+                </span>
+                <button
+                  className="cursor-pointer text-ink-600 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-400"
+                  onClick={() => patch({ subtasks: task.subtasks.filter((s) => s.id !== sub.id) })}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 px-1">
+              <Plus size={14} className="text-ink-400" />
+              <input
+                className="flex-1 bg-transparent py-1 text-sm outline-none placeholder-ink-400"
+                placeholder="Add subtask…"
+                value={newSubtask}
+                onChange={(e) => setNewSubtask(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addSubtask()}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 flex items-center justify-between border-t border-ink-800 pt-4">
+          <button
+            className="btn-danger"
+            onClick={() => {
+              deleteTask(task.id)
+              onClose()
+            }}
+          >
+            <Trash2 size={14} /> Delete
+          </button>
+          <button
+            className="btn-primary"
+            onClick={() => {
+              startPomodoro(task.id)
+              setView('pomodoro')
+              onClose()
+            }}
+          >
+            <Play size={14} /> Focus on this
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
