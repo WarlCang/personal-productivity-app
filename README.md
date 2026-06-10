@@ -17,7 +17,7 @@ Then open http://localhost:5173.
 
 - **Todos** — quick-add tasks with optional priority, tags, subtasks, and due dates. Filter by tag, sort by date/priority.
 - **Kanban** — the same tasks on a drag-and-drop board. Columns are customizable; dropping a card into *Done* completes the task (and vice versa).
-- **Calendar** — month and week views. Tasks with due dates appear automatically; standalone events support start/end times and daily/weekly/monthly recurrence.
+- **Calendar** — month and week views. Tasks with due dates appear automatically; standalone events support start/end times and daily/weekly/monthly recurrence. Follows the Chinese work calendar: statutory holidays are marked 休 and weekend makeup workdays (调休) are marked 班, per the State Council's annual notice (2026 data from 国办发明电〔2025〕7号; see `src/utils/chinaWorkCalendar.ts` for sources and how to add future years).
 - **Notes** — Notion-style rich text editor (TipTap) with folders, search, and checklists.
 - **Pomodoro** — configurable focus/break cycles with long breaks, sound + browser notifications, per-day focus stats, and optional task linking ("Focus on this" from any task).
 - **Drop Defense** — catch falling phones in a TORRAS case. Only playable during pomodoro breaks: focus to earn play time. Mouse or ←/→ to move; golden phones are worth 50.

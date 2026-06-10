@@ -17,6 +17,7 @@ import { ChevronLeft, ChevronRight, Plus, Repeat } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import type { CalendarEvent, Task } from '../../types'
 import { occursOn } from '../../utils/recurrence'
+import { getChinaDayInfo, hasChinaCalendarData, isHolidayStart } from '../../utils/chinaWorkCalendar'
 import EventModal from './EventModal'
 import TaskModal from '../todo/TaskModal'
 
@@ -75,6 +76,24 @@ function TaskPill({ task, onClick }: { task: Task; onClick: () => void }) {
       ☐ {task.title}
     </button>
   )
+}
+
+/** 休/班 marker following the Chinese work calendar (法定节假日与调休). */
+function ChinaDayBadge({ day }: { day: Date }) {
+  const info = getChinaDayInfo(day)
+  if (info.kind === 'holiday')
+    return (
+      <span title={`${info.name} · 放假`} className="rounded bg-emerald-500/15 px-1 text-[10px] leading-4 font-semibold text-emerald-400">
+        休
+      </span>
+    )
+  if (info.kind === 'makeupWorkday')
+    return (
+      <span title={`${info.name}调休 · 上班`} className="rounded bg-red-500/15 px-1 text-[10px] leading-4 font-semibold text-red-400">
+        班
+      </span>
+    )
+  return null
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
@@ -144,6 +163,23 @@ export default function CalendarView() {
         </button>
       </div>
 
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-400">
+        <span className="flex items-center gap-1.5">
+          <span className="rounded bg-emerald-500/15 px-1 text-[10px] font-semibold text-emerald-400">休</span>
+          statutory holiday
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="rounded bg-red-500/15 px-1 text-[10px] font-semibold text-red-400">班</span>
+          makeup workday (调休)
+        </span>
+        <span>Chinese work calendar per State Council notice 国办发明电〔2025〕7号</span>
+        {!hasChinaCalendarData(cursor.getFullYear()) && (
+          <span className="text-amber-400/80">
+            No holiday data for {cursor.getFullYear()} yet — the State Council notice isn't published.
+          </span>
+        )}
+      </div>
+
       {mode === 'month' ? (
         <div className="card mt-5 flex flex-1 flex-col overflow-hidden">
           <div className="grid grid-cols-7 border-b border-ink-800">
@@ -158,24 +194,32 @@ export default function CalendarView() {
               const key = format(day, 'yyyy-MM-dd')
               const { events, tasks } = items.get(key)!
               const inMonth = isSameMonth(day, cursor)
+              const dayInfo = getChinaDayInfo(day)
               return (
                 <div
                   key={key}
                   className={`min-h-24 cursor-pointer border-r border-b border-ink-800/70 p-1.5 transition-colors last:border-r-0 hover:bg-ink-850 ${
-                    inMonth ? '' : 'bg-ink-950/60'
+                    !inMonth ? 'bg-ink-950/60' : dayInfo.kind === 'holiday' ? 'bg-emerald-500/[0.05]' : ''
                   }`}
                   onClick={() => setModal({ event: null, date: day })}
                 >
-                  <div
-                    className={`mb-1 flex h-6 w-6 items-center justify-center rounded-full text-xs ${
-                      isToday(day)
-                        ? 'bg-brand-500 font-bold text-ink-950'
-                        : inMonth
-                          ? 'text-ink-200'
-                          : 'text-ink-600'
-                    }`}
-                  >
-                    {format(day, 'd')}
+                  <div className="mb-1 flex items-center gap-1">
+                    <div
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${
+                        isToday(day)
+                          ? 'bg-brand-500 font-bold text-ink-950'
+                          : inMonth
+                            ? 'text-ink-200'
+                            : 'text-ink-600'
+                      }`}
+                    >
+                      {format(day, 'd')}
+                    </div>
+                    {dayInfo.kind === 'holiday' && isHolidayStart(day) && (
+                      <span className="truncate text-[10px] text-emerald-400">{dayInfo.name}</span>
+                    )}
+                    <div className="flex-1" />
+                    <ChinaDayBadge day={day} />
                   </div>
                   <div className="flex flex-col gap-0.5">
                     {events.slice(0, 3).map((ev) => (
@@ -199,7 +243,10 @@ export default function CalendarView() {
             <div />
             {days.map((day) => (
               <div key={day.toISOString()} className="border-l border-ink-800 px-2 py-2 text-center">
-                <div className="text-xs text-ink-400">{format(day, 'EEE')}</div>
+                <div className="flex items-center justify-center gap-1 text-xs text-ink-400">
+                  {format(day, 'EEE')}
+                  <ChinaDayBadge day={day} />
+                </div>
                 <div
                   className={`mx-auto mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm ${
                     isToday(day) ? 'bg-brand-500 font-bold text-ink-950' : 'text-ink-100'
@@ -207,6 +254,9 @@ export default function CalendarView() {
                 >
                   {format(day, 'd')}
                 </div>
+                {getChinaDayInfo(day).kind === 'holiday' && (
+                  <div className="truncate text-[10px] text-emerald-400">{getChinaDayInfo(day).name}</div>
+                )}
                 {/* All-day row: tasks + untimed events */}
                 <div className="mt-1 flex flex-col gap-0.5">
                   {items
