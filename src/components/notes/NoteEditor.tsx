@@ -20,6 +20,7 @@ import {
   Undo2,
 } from 'lucide-react'
 import { useStore } from '../../store/useStore'
+import { useT } from '../../i18n'
 import type { Note } from '../../types'
 
 function ToolbarButton({
@@ -52,13 +53,14 @@ function ToolbarButton({
 
 export default function NoteEditor({ note }: { note: Note }) {
   const updateNote = useStore((s) => s.updateNote)
+  const t = useT()
 
   const editor = useEditor({
     extensions: [
       StarterKit,
       TaskList,
       TaskItem.configure({ nested: true }),
-      Placeholder.configure({ placeholder: 'Start writing…' }),
+      Placeholder.configure({ placeholder: t('notes.startWriting') }),
     ],
     content: note.content,
     onUpdate: ({ editor }) => updateNote(note.id, { content: editor.getHTML() }),
@@ -74,34 +76,34 @@ export default function NoteEditor({ note }: { note: Note }) {
         <input
           className="w-full bg-transparent text-3xl font-bold text-white outline-none placeholder-ink-500"
           value={note.title}
-          placeholder="Untitled"
+          placeholder={t('notes.untitled')}
           onChange={(e) => updateNote(note.id, { title: e.target.value })}
         />
         <input
           className="mt-1 w-48 bg-transparent text-xs text-ink-400 outline-none placeholder-ink-600"
           value={note.folder}
-          placeholder="Add to folder…"
+          placeholder={t('notes.folderPlaceholder')}
           onChange={(e) => updateNote(note.id, { folder: e.target.value.trim() })}
         />
       </div>
 
       <div className="sticky top-0 z-10 mx-8 mt-4 flex flex-wrap items-center gap-0.5 rounded-lg border border-ink-800 bg-ink-900/95 px-2 py-1 backdrop-blur">
-        <ToolbarButton editor={editor} title="Bold" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
+        <ToolbarButton editor={editor} title={t('editor.bold')} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
           <Bold size={15} />
         </ToolbarButton>
-        <ToolbarButton editor={editor} title="Italic" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
+        <ToolbarButton editor={editor} title={t('editor.italic')} active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
           <Italic size={15} />
         </ToolbarButton>
-        <ToolbarButton editor={editor} title="Strikethrough" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
+        <ToolbarButton editor={editor} title={t('editor.strike')} active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
           <Strikethrough size={15} />
         </ToolbarButton>
-        <ToolbarButton editor={editor} title="Inline code" active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>
+        <ToolbarButton editor={editor} title={t('editor.code')} active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>
           <Code size={15} />
         </ToolbarButton>
         {divider}
         <ToolbarButton
           editor={editor}
-          title="Heading 1"
+          title={t('editor.h1')}
           active={editor.isActive('heading', { level: 1 })}
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
         >
@@ -109,7 +111,7 @@ export default function NoteEditor({ note }: { note: Note }) {
         </ToolbarButton>
         <ToolbarButton
           editor={editor}
-          title="Heading 2"
+          title={t('editor.h2')}
           active={editor.isActive('heading', { level: 2 })}
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         >
@@ -117,34 +119,34 @@ export default function NoteEditor({ note }: { note: Note }) {
         </ToolbarButton>
         <ToolbarButton
           editor={editor}
-          title="Heading 3"
+          title={t('editor.h3')}
           active={editor.isActive('heading', { level: 3 })}
           onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
         >
           <Heading3 size={15} />
         </ToolbarButton>
         {divider}
-        <ToolbarButton editor={editor} title="Bullet list" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+        <ToolbarButton editor={editor} title={t('editor.bulletList')} active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
           <List size={15} />
         </ToolbarButton>
-        <ToolbarButton editor={editor} title="Numbered list" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+        <ToolbarButton editor={editor} title={t('editor.orderedList')} active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
           <ListOrdered size={15} />
         </ToolbarButton>
-        <ToolbarButton editor={editor} title="Checklist" active={editor.isActive('taskList')} onClick={() => editor.chain().focus().toggleTaskList().run()}>
+        <ToolbarButton editor={editor} title={t('editor.taskList')} active={editor.isActive('taskList')} onClick={() => editor.chain().focus().toggleTaskList().run()}>
           <ListTodo size={15} />
         </ToolbarButton>
         {divider}
-        <ToolbarButton editor={editor} title="Quote" active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
+        <ToolbarButton editor={editor} title={t('editor.quote')} active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
           <Quote size={15} />
         </ToolbarButton>
-        <ToolbarButton editor={editor} title="Divider" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+        <ToolbarButton editor={editor} title={t('editor.divider')} onClick={() => editor.chain().focus().setHorizontalRule().run()}>
           <Minus size={15} />
         </ToolbarButton>
         {divider}
-        <ToolbarButton editor={editor} title="Undo" onClick={() => editor.chain().focus().undo().run()}>
+        <ToolbarButton editor={editor} title={t('editor.undo')} onClick={() => editor.chain().focus().undo().run()}>
           <Undo2 size={15} />
         </ToolbarButton>
-        <ToolbarButton editor={editor} title="Redo" onClick={() => editor.chain().focus().redo().run()}>
+        <ToolbarButton editor={editor} title={t('editor.redo')} onClick={() => editor.chain().focus().redo().run()}>
           <Redo2 size={15} />
         </ToolbarButton>
       </div>

@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { FileText, FolderOpen, Plus, Search, Trash2 } from 'lucide-react'
+import { ChevronDown, FileText, FolderOpen, Plus, Search, Trash2 } from 'lucide-react'
 import { useStore } from '../../store/useStore'
+import { useT } from '../../i18n'
+import { NOTE_TEMPLATES, type NoteTemplate } from '../../utils/torrasPresets'
 import NoteEditor from './NoteEditor'
 
 function stripHtml(html: string): string {
@@ -14,9 +16,12 @@ export default function NotesView() {
   const notes = useStore((s) => s.notes)
   const addNote = useStore((s) => s.addNote)
   const deleteNote = useStore((s) => s.deleteNote)
+  const language = useStore((s) => s.language)
+  const t = useT()
   const [selectedId, setSelectedId] = useState<string | null>(notes[0]?.id ?? null)
   const [query, setQuery] = useState('')
   const [folderFilter, setFolderFilter] = useState('')
+  const [showTemplates, setShowTemplates] = useState(false)
 
   const folders = useMemo(
     () => [...new Set(notes.map((n) => n.folder).filter(Boolean))].sort(),
@@ -33,8 +38,16 @@ export default function NotesView() {
 
   const selected = notes.find((n) => n.id === selectedId) ?? null
 
-  const createNote = () => {
-    const note = addNote(folderFilter)
+  const createNote = (template?: NoteTemplate) => {
+    const dateLabel = format(new Date(), 'yyyy-MM-dd')
+    const note = template
+      ? addNote({
+          title: template.title(language, dateLabel),
+          content: template.content[language],
+          folder: template.folder[language],
+        })
+      : addNote({ folder: folderFilter })
+    setShowTemplates(false)
     setSelectedId(note.id)
   }
 
@@ -42,10 +55,33 @@ export default function NotesView() {
     <div className="flex h-full">
       <div className="flex w-72 shrink-0 flex-col border-r border-ink-800">
         <div className="flex items-center gap-2 px-4 pt-6 pb-3">
-          <h1 className="flex-1 text-xl font-bold text-white">Notes</h1>
-          <button className="btn-primary px-2.5" onClick={createNote} title="New note">
-            <Plus size={15} />
-          </button>
+          <h1 className="flex-1 text-xl font-bold text-white">{t('notes.title')}</h1>
+          <div className="relative">
+            <button className="btn-primary px-2.5" onClick={() => setShowTemplates(!showTemplates)} title={t('notes.new')}>
+              <Plus size={15} />
+              <ChevronDown size={12} />
+            </button>
+            {showTemplates && (
+              <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-ink-700 bg-ink-850 p-1 shadow-xl shadow-black/40">
+                <button
+                  className="block w-full cursor-pointer rounded-md px-3 py-1.5 text-left text-sm text-ink-200 transition-colors hover:bg-ink-800"
+                  onClick={() => createNote()}
+                >
+                  {t('notes.template.blank')}
+                </button>
+                <div className="mx-2 my-1 border-t border-ink-700" />
+                {NOTE_TEMPLATES.map((template) => (
+                  <button
+                    key={template.nameKey}
+                    className="block w-full cursor-pointer rounded-md px-3 py-1.5 text-left text-sm text-ink-200 transition-colors hover:bg-ink-800"
+                    onClick={() => createNote(template)}
+                  >
+                    {t(template.nameKey)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="px-4 pb-2">
@@ -53,7 +89,7 @@ export default function NotesView() {
             <Search size={14} className="text-ink-400" />
             <input
               className="w-full bg-transparent py-1.5 text-sm outline-none placeholder-ink-400"
-              placeholder="Search notes…"
+              placeholder={t('notes.search')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -66,7 +102,7 @@ export default function NotesView() {
               className={`chip cursor-pointer ${!folderFilter ? 'bg-brand-500/15 text-brand-400' : 'bg-ink-800 text-ink-300 hover:bg-ink-700'}`}
               onClick={() => setFolderFilter('')}
             >
-              All
+              {t('notes.all')}
             </button>
             {folders.map((f) => (
               <button
@@ -83,7 +119,7 @@ export default function NotesView() {
         <div className="flex-1 overflow-y-auto px-2 pb-4">
           {visible.length === 0 && (
             <div className="px-4 py-8 text-center text-sm text-ink-400">
-              {notes.length === 0 ? 'No notes yet. Create one!' : 'No matches.'}
+              {notes.length === 0 ? t('notes.emptyList') : t('notes.noMatches')}
             </div>
           )}
           {visible.map((note) => (
@@ -96,13 +132,13 @@ export default function NotesView() {
             >
               <div className="flex items-center gap-2">
                 <FileText size={13} className="shrink-0 text-brand-500" />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink-100">{note.title || 'Untitled'}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink-100">{note.title || t('notes.untitled')}</span>
                 <Trash2
                   size={13}
                   className="shrink-0 text-ink-600 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-400"
                   onClick={(e) => {
                     e.stopPropagation()
-                    if (confirm(`Delete "${note.title}"?`)) {
+                    if (confirm(t('notes.deleteConfirm', { title: note.title || t('notes.untitled') }))) {
                       deleteNote(note.id)
                       if (selectedId === note.id) setSelectedId(null)
                     }
@@ -113,7 +149,7 @@ export default function NotesView() {
                 {format(parseISO(note.updatedAt), 'MMM d')}
                 {note.folder && ` · ${note.folder}`}
                 {' · '}
-                {stripHtml(note.content).slice(0, 60) || 'Empty'}
+                {stripHtml(note.content).slice(0, 60) || t('notes.empty')}
               </div>
             </button>
           ))}
@@ -126,9 +162,9 @@ export default function NotesView() {
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-ink-400">
             <FileText size={40} strokeWidth={1.2} />
-            <p className="text-sm">Select a note or create a new one</p>
-            <button className="btn-primary" onClick={createNote}>
-              <Plus size={14} /> New note
+            <p className="text-sm">{t('notes.selectPrompt')}</p>
+            <button className="btn-primary" onClick={() => createNote()}>
+              <Plus size={14} /> {t('notes.new')}
             </button>
           </div>
         )}

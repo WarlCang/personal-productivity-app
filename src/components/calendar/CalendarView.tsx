@@ -15,9 +15,11 @@ import {
 } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus, Repeat } from 'lucide-react'
 import { useStore } from '../../store/useStore'
+import { useT, useDateLocale } from '../../i18n'
 import type { CalendarEvent, Task } from '../../types'
 import { occursOn } from '../../utils/recurrence'
 import { getChinaDayInfo, hasChinaCalendarData, isHolidayStart } from '../../utils/chinaWorkCalendar'
+import { promoLabel, promosOn, upcomingPromos, type PromoEvent } from '../../utils/promoCalendar'
 import EventModal from './EventModal'
 import TaskModal from '../todo/TaskModal'
 
@@ -78,6 +80,15 @@ function TaskPill({ task, onClick }: { task: Task; onClick: () => void }) {
   )
 }
 
+function PromoPill({ promo }: { promo: PromoEvent }) {
+  const language = useStore((s) => s.language)
+  return (
+    <span className="block w-full truncate rounded bg-purple-500/15 px-1.5 py-0.5 text-left text-[11px] text-purple-300">
+      {promoLabel(promo, language)}
+    </span>
+  )
+}
+
 /** 休/班 marker following the Chinese work calendar (法定节假日与调休). */
 function ChinaDayBadge({ day }: { day: Date }) {
   const info = getChinaDayInfo(day)
@@ -108,6 +119,9 @@ export default function CalendarView() {
   const [cursor, setCursor] = useState(() => new Date())
   const [modal, setModal] = useState<{ event: CalendarEvent | null; date: Date } | null>(null)
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
+  const t = useT()
+  const locale = useDateLocale()
+  const language = useStore((s) => s.language)
 
   const days = useMemo(() => {
     if (mode === 'month') {
@@ -125,20 +139,26 @@ export default function CalendarView() {
 
   const title =
     mode === 'month'
-      ? format(cursor, 'MMMM yyyy')
-      : `${format(startOfWeek(cursor), 'MMM d')} – ${format(endOfWeek(cursor), 'MMM d, yyyy')}`
+      ? language === 'zh'
+        ? format(cursor, 'yyyy年M月')
+        : format(cursor, 'MMMM yyyy')
+      : language === 'zh'
+        ? `${format(startOfWeek(cursor), 'M月d日')} – ${format(endOfWeek(cursor), 'M月d日')}, ${format(cursor, 'yyyy')}`
+        : `${format(startOfWeek(cursor), 'MMM d')} – ${format(endOfWeek(cursor), 'MMM d, yyyy')}`
+
+  const upcoming = upcomingPromos(new Date(), 2)
 
   return (
     <div className="flex h-full flex-col px-6 py-8">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold text-white">Calendar</h1>
+        <h1 className="text-2xl font-bold text-white">{t('calendar.title')}</h1>
         <div className="flex-1" />
         <div className="flex items-center gap-1">
           <button className="btn-ghost px-2" onClick={() => navigate(-1)}>
             <ChevronLeft size={16} />
           </button>
           <button className="btn-ghost" onClick={() => setCursor(new Date())}>
-            Today
+            {t('calendar.today')}
           </button>
           <button className="btn-ghost px-2" onClick={() => navigate(1)}>
             <ChevronRight size={16} />
@@ -149,43 +169,53 @@ export default function CalendarView() {
           {(['month', 'week'] as const).map((m) => (
             <button
               key={m}
-              className={`cursor-pointer rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors ${
+              className={`cursor-pointer rounded-md px-3 py-1 text-xs font-medium transition-colors ${
                 mode === m ? 'bg-brand-500 text-ink-950' : 'text-ink-300 hover:text-ink-100'
               }`}
               onClick={() => setMode(m)}
             >
-              {m}
+              {m === 'month' ? t('calendar.month') : t('calendar.week')}
             </button>
           ))}
         </div>
         <button className="btn-primary" onClick={() => setModal({ event: null, date: new Date() })}>
-          <Plus size={14} /> Event
+          <Plus size={14} /> {t('calendar.event')}
         </button>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-400">
         <span className="flex items-center gap-1.5">
           <span className="rounded bg-emerald-500/15 px-1 text-[10px] font-semibold text-emerald-400">休</span>
-          statutory holiday
+          {t('calendar.legendHoliday')}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="rounded bg-red-500/15 px-1 text-[10px] font-semibold text-red-400">班</span>
-          makeup workday (调休)
+          {t('calendar.legendMakeup')}
         </span>
-        <span>Chinese work calendar per State Council notice 国办发明电〔2025〕7号</span>
+        <span className="flex items-center gap-1.5">
+          <span className="rounded bg-purple-500/15 px-1 text-[10px] font-semibold text-purple-300">促</span>
+          {t('calendar.legendPromo')}
+        </span>
+        <span>{t('calendar.source')}</span>
         {!hasChinaCalendarData(cursor.getFullYear()) && (
-          <span className="text-amber-400/80">
-            No holiday data for {cursor.getFullYear()} yet — the State Council notice isn't published.
-          </span>
+          <span className="text-amber-400/80">{t('calendar.noData', { year: cursor.getFullYear() })}</span>
         )}
+        <div className="flex-1" />
+        {upcoming.map(({ promo, days }) => (
+          <span key={promo.id} className="chip bg-purple-500/15 text-purple-300">
+            {days <= 0
+              ? t('calendar.promoToday', { name: promoLabel(promo, language) })
+              : t('calendar.nextPromo', { name: promoLabel(promo, language), days })}
+          </span>
+        ))}
       </div>
 
       {mode === 'month' ? (
         <div className="card mt-5 flex flex-1 flex-col overflow-hidden">
           <div className="grid grid-cols-7 border-b border-ink-800">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-              <div key={d} className="px-2 py-2 text-center text-xs font-semibold text-ink-400">
-                {d}
+            {days.slice(0, 7).map((d) => (
+              <div key={d.toISOString()} className="px-2 py-2 text-center text-xs font-semibold text-ink-400">
+                {format(d, 'EEE', { locale })}
               </div>
             ))}
           </div>
@@ -222,14 +252,17 @@ export default function CalendarView() {
                     <ChinaDayBadge day={day} />
                   </div>
                   <div className="flex flex-col gap-0.5">
+                    {promosOn(day).map((promo) => (
+                      <PromoPill key={promo.id} promo={promo} />
+                    ))}
                     {events.slice(0, 3).map((ev) => (
                       <EventPill key={ev.id} event={ev} onClick={() => setModal({ event: ev, date: day })} />
                     ))}
-                    {tasks.slice(0, 2).map((t) => (
-                      <TaskPill key={t.id} task={t} onClick={() => setOpenTaskId(t.id)} />
+                    {tasks.slice(0, 2).map((task) => (
+                      <TaskPill key={task.id} task={task} onClick={() => setOpenTaskId(task.id)} />
                     ))}
                     {events.length + tasks.length > 5 && (
-                      <span className="px-1.5 text-[10px] text-ink-400">+{events.length + tasks.length - 5} more</span>
+                      <span className="px-1.5 text-[10px] text-ink-400">{t('calendar.more', { n: events.length + tasks.length - 5 })}</span>
                     )}
                   </div>
                 </div>
@@ -244,7 +277,7 @@ export default function CalendarView() {
             {days.map((day) => (
               <div key={day.toISOString()} className="border-l border-ink-800 px-2 py-2 text-center">
                 <div className="flex items-center justify-center gap-1 text-xs text-ink-400">
-                  {format(day, 'EEE')}
+                  {format(day, 'EEE', { locale })}
                   <ChinaDayBadge day={day} />
                 </div>
                 <div
@@ -259,14 +292,17 @@ export default function CalendarView() {
                 )}
                 {/* All-day row: tasks + untimed events */}
                 <div className="mt-1 flex flex-col gap-0.5">
+                  {promosOn(day).map((promo) => (
+                    <PromoPill key={promo.id} promo={promo} />
+                  ))}
                   {items
                     .get(format(day, 'yyyy-MM-dd'))!
                     .events.filter((e) => !e.startTime)
                     .map((ev) => (
                       <EventPill key={ev.id} event={ev} onClick={() => setModal({ event: ev, date: day })} />
                     ))}
-                  {items.get(format(day, 'yyyy-MM-dd'))!.tasks.map((t) => (
-                    <TaskPill key={t.id} task={t} onClick={() => setOpenTaskId(t.id)} />
+                  {items.get(format(day, 'yyyy-MM-dd'))!.tasks.map((task) => (
+                    <TaskPill key={task.id} task={task} onClick={() => setOpenTaskId(task.id)} />
                   ))}
                 </div>
               </div>

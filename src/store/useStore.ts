@@ -13,6 +13,7 @@ import type {
 } from '../types'
 import { uid } from '../utils/id'
 import { playChime } from '../utils/sound'
+import { translate, type Lang } from '../i18n/dict'
 
 const DEFAULT_COLUMNS: Column[] = [
   { id: 'col-todo', title: 'To Do', order: 0 },
@@ -29,9 +30,13 @@ const DEFAULT_POMODORO: PomodoroSettings = {
   notificationsEnabled: false,
 }
 
+export type { Lang }
+
 interface Store {
   view: ViewName
   setView: (view: ViewName) => void
+  language: Lang
+  setLanguage: (language: Lang) => void
 
   tasks: Task[]
   columns: Column[]
@@ -45,6 +50,7 @@ interface Store {
   renameColumn: (id: string, title: string) => void
   deleteColumn: (id: string) => void
   moveColumn: (id: string, direction: -1 | 1) => void
+  applyBoardTemplate: (columns: { title: string; isDoneColumn?: boolean }[]) => void
 
   events: CalendarEvent[]
   addEvent: (partial: Omit<CalendarEvent, 'id'>) => void
@@ -52,7 +58,7 @@ interface Store {
   deleteEvent: (id: string) => void
 
   notes: Note[]
-  addNote: (folder?: string) => Note
+  addNote: (partial?: { title?: string; content?: string; folder?: string }) => Note
   updateNote: (id: string, patch: Partial<Note>) => void
   deleteNote: (id: string) => void
 
@@ -81,13 +87,10 @@ interface Store {
   setGameHighScore: (score: number) => void
 }
 
-function notifyPhaseEnd(settings: PomodoroSettings, finished: PomodoroPhase) {
+function notifyPhaseEnd(settings: PomodoroSettings, finished: PomodoroPhase, lang: Lang) {
   if (settings.soundEnabled) playChime()
   if (settings.notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-    const body =
-      finished === 'focus'
-        ? 'Focus session complete — time for a break. The game is unlocked!'
-        : 'Break is over — back to focus.'
+    const body = translate(lang, finished === 'focus' ? 'pomodoro.notifFocusDone' : 'pomodoro.notifBreakDone')
     new Notification('TORRAS Productivity', { body, icon: '/favicon.svg' })
   }
 }
@@ -107,6 +110,8 @@ export const useStore = create<Store>()(
     (set, get) => ({
       view: 'todos',
       setView: (view) => set({ view }),
+      language: 'en',
+      setLanguage: (language) => set({ language }),
 
       tasks: [],
       columns: DEFAULT_COLUMNS,
@@ -196,6 +201,25 @@ export const useStore = create<Store>()(
         })
       },
 
+      applyBoardTemplate: (templateColumns) => {
+        const columns: Column[] = templateColumns.map((c, i) => ({
+          id: uid(),
+          title: c.title,
+          order: i,
+          isDoneColumn: c.isDoneColumn,
+        }))
+        const firstCol = columns.find((c) => !c.isDoneColumn) ?? columns[0]
+        const doneCol = columns.find((c) => c.isDoneColumn) ?? columns[columns.length - 1]
+        set({
+          columns,
+          tasks: get().tasks.map((t, i) => ({
+            ...t,
+            columnId: t.done ? doneCol.id : firstCol.id,
+            order: i,
+          })),
+        })
+      },
+
       moveColumn: (id, direction) => {
         const sorted = [...get().columns].sort((a, b) => a.order - b.order)
         const index = sorted.findIndex((c) => c.id === id)
@@ -212,9 +236,16 @@ export const useStore = create<Store>()(
       deleteEvent: (id) => set({ events: get().events.filter((e) => e.id !== id) }),
 
       notes: [],
-      addNote: (folder = '') => {
+      addNote: (partial = {}) => {
         const now = new Date().toISOString()
-        const note: Note = { id: uid(), title: 'Untitled', content: '', folder, createdAt: now, updatedAt: now }
+        const note: Note = {
+          id: uid(),
+          title: partial.title ?? '',
+          content: partial.content ?? '',
+          folder: partial.folder ?? '',
+          createdAt: now,
+          updatedAt: now,
+        }
         set({ notes: [note, ...get().notes] })
         return note
       },
@@ -307,7 +338,7 @@ export const useStore = create<Store>()(
           return
         }
         // Phase finished.
-        notifyPhaseEnd(pomodoroSettings, phase)
+        notifyPhaseEnd(pomodoroSettings, phase, get().language)
         if (phase === 'focus') {
           const newRound = round + 1
           const session: FocusSession = {

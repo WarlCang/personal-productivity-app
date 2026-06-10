@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react'
 import { format, subDays } from 'date-fns'
 import { Bell, BellOff, Gamepad2, Pause, Play, RotateCcw, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { useStore, useGameUnlocked } from '../../store/useStore'
+import { useT, useDateLocale, type TKey } from '../../i18n'
 import type { PomodoroPhase } from '../../types'
 
-const PHASE_LABEL: Record<PomodoroPhase, string> = {
-  focus: 'Focus',
-  break: 'Short break',
-  longBreak: 'Long break',
+const PHASE_KEY: Record<PomodoroPhase, TKey> = {
+  focus: 'pomodoro.phaseFocus',
+  break: 'pomodoro.phaseBreak',
+  longBreak: 'pomodoro.phaseLongBreak',
 }
 
 function formatClock(seconds: number): string {
@@ -79,6 +80,8 @@ export default function PomodoroView() {
   const sessions = useStore((s) => s.sessions)
   const setView = useStore((s) => s.setView)
   const gameUnlocked = useGameUnlocked()
+  const t = useT()
+  const locale = useDateLocale()
   const [showSettings, setShowSettings] = useState(false)
 
   const totalSeconds =
@@ -93,16 +96,16 @@ export default function PomodoroView() {
       const d = subDays(new Date(), 6 - i)
       const key = format(d, 'yyyy-MM-dd')
       const minutes = sessions.filter((s) => s.date === key).reduce((sum, s) => sum + s.minutes, 0)
-      return { label: format(d, 'EEE'), key, minutes }
+      return { label: format(d, 'EEE', { locale }), key, minutes }
     })
     const todayMinutes = sessions.filter((s) => s.date === today).reduce((sum, s) => sum + s.minutes, 0)
     const todayCount = sessions.filter((s) => s.date === today).length
     return { days, todayMinutes, todayCount, max: Math.max(25, ...days.map((d) => d.minutes)) }
-  }, [sessions])
+  }, [sessions, locale])
 
   const requestNotifications = async () => {
     if (settings.notificationsEnabled) return updateSettings({ notificationsEnabled: false })
-    if (!('Notification' in window)) return alert('This browser does not support notifications.')
+    if (!('Notification' in window)) return alert(t('pomodoro.notifUnsupported'))
     const permission = await Notification.requestPermission()
     if (permission === 'granted') updateSettings({ notificationsEnabled: true })
   }
@@ -110,35 +113,35 @@ export default function PomodoroView() {
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Pomodoro</h1>
+        <h1 className="text-2xl font-bold text-white">{t('pomodoro.title')}</h1>
         <div className="flex items-center gap-1">
           <button
             className="btn-ghost px-2"
-            title={settings.soundEnabled ? 'Sound on' : 'Sound off'}
+            title={settings.soundEnabled ? t('pomodoro.soundOn') : t('pomodoro.soundOff')}
             onClick={() => updateSettings({ soundEnabled: !settings.soundEnabled })}
           >
             {settings.soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
           </button>
           <button
             className="btn-ghost px-2"
-            title={settings.notificationsEnabled ? 'Notifications on' : 'Notifications off'}
+            title={settings.notificationsEnabled ? t('pomodoro.notifOn') : t('pomodoro.notifOff')}
             onClick={requestNotifications}
           >
             {settings.notificationsEnabled ? <Bell size={16} /> : <BellOff size={16} />}
           </button>
           <button className="btn-ghost" onClick={() => setShowSettings(!showSettings)}>
-            Settings
+            {t('pomodoro.settings')}
           </button>
         </div>
       </div>
 
       {showSettings && (
         <div className="card mt-4 grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
-          <NumberField label="Focus (min)" value={settings.focusMinutes} min={1} max={120} onChange={(v) => updateSettings({ focusMinutes: v })} />
-          <NumberField label="Break (min)" value={settings.breakMinutes} min={1} max={60} onChange={(v) => updateSettings({ breakMinutes: v })} />
-          <NumberField label="Long break (min)" value={settings.longBreakMinutes} min={1} max={90} onChange={(v) => updateSettings({ longBreakMinutes: v })} />
+          <NumberField label={t('pomodoro.focusMin')} value={settings.focusMinutes} min={1} max={120} onChange={(v) => updateSettings({ focusMinutes: v })} />
+          <NumberField label={t('pomodoro.breakMin')} value={settings.breakMinutes} min={1} max={60} onChange={(v) => updateSettings({ breakMinutes: v })} />
+          <NumberField label={t('pomodoro.longBreakMin')} value={settings.longBreakMinutes} min={1} max={90} onChange={(v) => updateSettings({ longBreakMinutes: v })} />
           <NumberField
-            label="Rounds before long"
+            label={t('pomodoro.roundsBeforeLong')}
             value={settings.roundsBeforeLongBreak}
             min={2}
             max={10}
@@ -151,7 +154,7 @@ export default function PomodoroView() {
         <span
           className={`chip ${phase === 'focus' ? 'bg-brand-500/15 text-brand-400' : 'bg-emerald-500/15 text-emerald-400'}`}
         >
-          {PHASE_LABEL[phase]} · round{' '}
+          {t(PHASE_KEY[phase])} · {t('pomodoro.round')}{' '}
           {phase === 'focus'
             ? (round % settings.roundsBeforeLongBreak) + 1
             : Math.max(1, ((round - 1 + settings.roundsBeforeLongBreak) % settings.roundsBeforeLongBreak) + 1)}
@@ -170,40 +173,40 @@ export default function PomodoroView() {
         <div className="mt-2 flex items-center gap-2">
           {!running && phase === 'focus' && secondsLeft === settings.focusMinutes * 60 ? (
             <button className="btn-primary px-6 py-2.5 text-base" onClick={() => startPomodoro()}>
-              <Play size={17} /> Start focus
+              <Play size={17} /> {t('pomodoro.start')}
             </button>
           ) : running ? (
             <button className="btn-primary px-6 py-2.5 text-base" onClick={pausePomodoro}>
-              <Pause size={17} /> Pause
+              <Pause size={17} /> {t('pomodoro.pause')}
             </button>
           ) : (
             <button className="btn-primary px-6 py-2.5 text-base" onClick={resumePomodoro}>
-              <Play size={17} /> Resume
+              <Play size={17} /> {t('pomodoro.resume')}
             </button>
           )}
-          <button className="btn-ghost" title="Skip phase" onClick={skipPhase}>
+          <button className="btn-ghost" title={t('pomodoro.skip')} onClick={skipPhase}>
             <SkipForward size={16} />
           </button>
-          <button className="btn-ghost" title="Reset" onClick={resetPomodoro}>
+          <button className="btn-ghost" title={t('pomodoro.reset')} onClick={resetPomodoro}>
             <RotateCcw size={16} />
           </button>
         </div>
 
         {gameUnlocked && (
           <button className="btn mt-4 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25" onClick={() => setView('game')}>
-            <Gamepad2 size={15} /> Break time — play Drop Defense!
+            <Gamepad2 size={15} /> {t('pomodoro.playPrompt')}
           </button>
         )}
 
         {phase === 'focus' && !running && openTasks.length > 0 && (
           <label className="mt-5 w-full max-w-sm text-xs text-ink-400">
-            Focus on a task (optional)
+            {t('pomodoro.taskSelect')}
             <select
               className="input mt-1 cursor-pointer"
               value={currentTaskId ?? ''}
               onChange={(e) => setCurrentTaskId(e.target.value || null)}
             >
-              <option value="">No task selected</option>
+              <option value="">{t('pomodoro.noTask')}</option>
               {openTasks.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.title}
@@ -216,10 +219,8 @@ export default function PomodoroView() {
 
       <div className="card mt-8 p-5">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-sm font-semibold text-white">Focus stats</h2>
-          <span className="text-xs text-ink-400">
-            Today: {stats.todayCount} session{stats.todayCount === 1 ? '' : 's'} · {stats.todayMinutes} min
-          </span>
+          <h2 className="text-sm font-semibold text-white">{t('pomodoro.stats')}</h2>
+          <span className="text-xs text-ink-400">{t('pomodoro.statsToday', { n: stats.todayCount, m: stats.todayMinutes })}</span>
         </div>
         <div className="mt-4 flex h-28 items-end gap-2">
           {stats.days.map((d) => (

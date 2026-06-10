@@ -14,21 +14,22 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities'
 import { useDroppable } from '@dnd-kit/core'
 import { format, parseISO } from 'date-fns'
-import { ArrowLeft, ArrowRight, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, LayoutTemplate, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../../store/useStore'
+import { useT } from '../../i18n'
+import { BOARD_TEMPLATES, tagChipClass, templateColumns } from '../../utils/torrasPresets'
 import type { Column, Task } from '../../types'
-import TaskModal, { PRIORITY_STYLES } from '../todo/TaskModal'
+import TaskModal, { PRIORITY_CHIP, PRIORITY_KEY } from '../todo/TaskModal'
 
 function CardBody({ task }: { task: Task }) {
+  const t = useT()
   const subDone = task.subtasks.filter((s) => s.done).length
   return (
     <>
       <div className={`text-sm ${task.done ? 'text-ink-400 line-through' : 'text-ink-100'}`}>{task.title}</div>
       {(task.priority || task.dueDate || task.tags.length > 0 || task.subtasks.length > 0) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {task.priority && (
-            <span className={`chip ${PRIORITY_STYLES[task.priority].chip}`}>{PRIORITY_STYLES[task.priority].label}</span>
-          )}
+          {task.priority && <span className={`chip ${PRIORITY_CHIP[task.priority]}`}>{t(PRIORITY_KEY[task.priority])}</span>}
           {task.dueDate && <span className="chip bg-ink-800 text-ink-300">{format(parseISO(task.dueDate), 'MMM d')}</span>}
           {task.subtasks.length > 0 && (
             <span className="chip bg-ink-800 text-ink-300">
@@ -37,7 +38,7 @@ function CardBody({ task }: { task: Task }) {
             </span>
           )}
           {task.tags.map((tag) => (
-            <span key={tag} className="chip bg-ink-800 text-ink-300">
+            <span key={tag} className={`chip ${tagChipClass(tag)}`}>
               #{tag}
             </span>
           ))}
@@ -78,6 +79,7 @@ function BoardColumn({
   const renameColumn = useStore((s) => s.renameColumn)
   const deleteColumn = useStore((s) => s.deleteColumn)
   const moveColumn = useStore((s) => s.moveColumn)
+  const t = useT()
   const [adding, setAdding] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [editing, setEditing] = useState(false)
@@ -122,7 +124,7 @@ function BoardColumn({
               <button
                 className="cursor-pointer rounded p-1 hover:bg-red-500/10 hover:text-red-400"
                 onClick={() => {
-                  if (tasks.length === 0 || confirm(`Delete "${column.title}"? Its ${tasks.length} task(s) move to the first column.`))
+                  if (tasks.length === 0 || confirm(t('kanban.deleteColumnConfirm', { title: column.title, n: tasks.length })))
                     deleteColumn(column.id)
                 }}
               >
@@ -146,7 +148,7 @@ function BoardColumn({
           <input
             autoFocus
             className="input text-sm"
-            placeholder="Card title…"
+            placeholder={t('kanban.cardPlaceholder')}
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             onKeyDown={(e) => {
@@ -157,7 +159,7 @@ function BoardColumn({
           />
         ) : (
           <button className="btn-ghost w-full justify-start" onClick={() => setAdding(true)}>
-            <Plus size={14} /> Add card
+            <Plus size={14} /> {t('kanban.addCard')}
           </button>
         )}
       </div>
@@ -171,7 +173,11 @@ export default function KanbanView() {
   const setTasks = useStore((s) => s.setTasks)
   const moveTask = useStore((s) => s.moveTask)
   const addColumn = useStore((s) => s.addColumn)
+  const applyBoardTemplate = useStore((s) => s.applyBoardTemplate)
+  const language = useStore((s) => s.language)
+  const t = useT()
   const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [showTemplates, setShowTemplates] = useState(false)
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const [addingColumn, setAddingColumn] = useState(false)
   const [columnTitle, setColumnTitle] = useState('')
@@ -224,8 +230,37 @@ export default function KanbanView() {
 
   return (
     <div className="flex h-full flex-col px-6 py-8">
-      <h1 className="text-2xl font-bold text-white">Kanban</h1>
-      <p className="mt-1 text-sm text-ink-400">Drag cards between columns — dropping into Done completes the task.</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">{t('kanban.title')}</h1>
+          <p className="mt-1 text-sm text-ink-400">{t('kanban.subtitle')}</p>
+        </div>
+        <div className="relative">
+          <button className="btn-ghost border border-ink-700" onClick={() => setShowTemplates(!showTemplates)}>
+            <LayoutTemplate size={14} /> {t('kanban.templates')}
+          </button>
+          {showTemplates && (
+            <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-ink-700 bg-ink-850 p-1 shadow-xl shadow-black/40">
+              {BOARD_TEMPLATES.map((template) => (
+                <button
+                  key={template.nameKey}
+                  className="block w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-ink-200 transition-colors hover:bg-ink-800"
+                  onClick={() => {
+                    setShowTemplates(false)
+                    if (confirm(t('kanban.applyTemplateConfirm', { name: t(template.nameKey) })))
+                      applyBoardTemplate(templateColumns(template, language))
+                  }}
+                >
+                  <div className="font-medium">{t(template.nameKey)}</div>
+                  <div className="mt-0.5 truncate text-xs text-ink-400">
+                    {templateColumns(template, language).map((c) => c.title).join(' → ')}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       <DndContext
         sensors={sensors}
@@ -245,7 +280,7 @@ export default function KanbanView() {
               <input
                 autoFocus
                 className="input"
-                placeholder="Column name…"
+                placeholder={t('kanban.columnPlaceholder')}
                 value={columnTitle}
                 onChange={(e) => setColumnTitle(e.target.value)}
                 onKeyDown={(e) => {
@@ -260,7 +295,7 @@ export default function KanbanView() {
               />
             ) : (
               <button className="btn-ghost w-full justify-start border border-dashed border-ink-700" onClick={() => setAddingColumn(true)}>
-                <Plus size={14} /> Add column
+                <Plus size={14} /> {t('kanban.addColumn')}
               </button>
             )}
           </div>

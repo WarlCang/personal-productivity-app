@@ -1,8 +1,16 @@
 # TORRAS Productivity
 
-A personal productivity app in TORRAS brand colors (black + orange): todo list, kanban board, calendar, rich-text notes, pomodoro timer, and a break-time mini game.
+A personal productivity app for TORRAS employees in brand colors (black + orange): todo list, kanban board, calendar, rich-text notes, pomodoro timer, and a break-time mini game.
 
-All data is stored locally in your browser (localStorage) — no account, no server.
+All data is stored locally in your browser (localStorage) — no account, no server. The full UI is bilingual (English / 中文) via the toggle at the bottom of the sidebar.
+
+## TORRAS-specific features
+
+- **Workspace presets** — built-in product-line tags (ostand, coolify, 保护壳, 充电) and team tags (运营, 市场, 设计, 供应链, 客服) with brand colors, one click to add from any task.
+- **Kanban templates** — Product Launch (需求评审→打样→测试→上架→已上市), Marketing Campaign (Brief→素材→审核→投放→复盘), and Listing Optimization board layouts.
+- **Note templates** — daily standup, 周报 weekly review, product brief, and competitor teardown, localized to the active language.
+- **Promo calendar** — 618, 双11, 双12, 38大促, 88会员节, Prime Day (est.), Black Friday, Cyber Monday, and gifting holidays as a calendar layer with "days until" countdown chips (`src/utils/promoCalendar.ts`).
+- **Chinese work calendar** — statutory holidays (休) and 调休 makeup workdays (班) per the State Council annual notice.
 
 ## Run it
 

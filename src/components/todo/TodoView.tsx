@@ -2,13 +2,16 @@ import { useMemo, useState } from 'react'
 import { format, isPast, isToday, parseISO } from 'date-fns'
 import { CalendarDays, ChevronDown, ListChecks, Plus } from 'lucide-react'
 import { useStore } from '../../store/useStore'
+import { useT } from '../../i18n'
+import { tagChipClass } from '../../utils/torrasPresets'
 import type { Task } from '../../types'
-import TaskModal, { PRIORITY_STYLES } from './TaskModal'
+import TaskModal, { PRIORITY_CHIP, PRIORITY_KEY } from './TaskModal'
 
 type SortMode = 'created' | 'dueDate' | 'priority'
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 }
 
 function DueChip({ task }: { task: Task }) {
+  const t = useT()
   if (!task.dueDate) return null
   const due = parseISO(task.dueDate)
   const overdue = !task.done && isPast(due) && !isToday(due)
@@ -19,13 +22,14 @@ function DueChip({ task }: { task: Task }) {
       }`}
     >
       <CalendarDays size={11} />
-      {isToday(due) ? 'Today' : format(due, 'MMM d')}
+      {isToday(due) ? t('todos.dueToday') : format(due, 'MMM d')}
     </span>
   )
 }
 
 export function TaskRow({ task, onOpen }: { task: Task; onOpen: () => void }) {
   const toggleTaskDone = useStore((s) => s.toggleTaskDone)
+  const t = useT()
   const subDone = task.subtasks.filter((s) => s.done).length
   return (
     <div
@@ -49,11 +53,11 @@ export function TaskRow({ task, onOpen }: { task: Task; onOpen: () => void }) {
         </span>
       )}
       {task.tags.map((tag) => (
-        <span key={tag} className="chip hidden bg-ink-800 text-ink-300 sm:inline-flex">
+        <span key={tag} className={`chip hidden sm:inline-flex ${tagChipClass(tag)}`}>
           #{tag}
         </span>
       ))}
-      {task.priority && <span className={`chip ${PRIORITY_STYLES[task.priority].chip}`}>{PRIORITY_STYLES[task.priority].label}</span>}
+      {task.priority && <span className={`chip ${PRIORITY_CHIP[task.priority]}`}>{t(PRIORITY_KEY[task.priority])}</span>}
       <DueChip task={task} />
     </div>
   )
@@ -62,6 +66,7 @@ export function TaskRow({ task, onOpen }: { task: Task; onOpen: () => void }) {
 export default function TodoView() {
   const tasks = useStore((s) => s.tasks)
   const addTask = useStore((s) => s.addTask)
+  const t = useT()
   const [title, setTitle] = useState('')
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const [tagFilter, setTagFilter] = useState<string>('')
@@ -98,16 +103,14 @@ export default function TodoView() {
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-8">
-      <h1 className="text-2xl font-bold text-white">Todos</h1>
-      <p className="mt-1 text-sm text-ink-400">
-        {tasks.length - doneCount} open · {doneCount} done
-      </p>
+      <h1 className="text-2xl font-bold text-white">{t('todos.title')}</h1>
+      <p className="mt-1 text-sm text-ink-400">{t('todos.summary', { open: tasks.length - doneCount, done: doneCount })}</p>
 
       <div className="card mt-5 flex items-center gap-2 px-3 py-2 focus-within:border-brand-500/60">
         <Plus size={17} className="text-brand-500" />
         <input
           className="flex-1 bg-transparent py-1 text-sm outline-none placeholder-ink-400"
-          placeholder="Add a task — press Enter"
+          placeholder={t('todos.addPlaceholder')}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
@@ -117,7 +120,7 @@ export default function TodoView() {
       <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
         <div className="relative">
           <select className="input w-auto cursor-pointer appearance-none pr-8" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
-            <option value="">All tags</option>
+            <option value="">{t('todos.allTags')}</option>
             {allTags.map((t) => (
               <option key={t} value={t}>
                 #{t}
@@ -128,22 +131,22 @@ export default function TodoView() {
         </div>
         <div className="relative">
           <select className="input w-auto cursor-pointer appearance-none pr-8" value={sort} onChange={(e) => setSort(e.target.value as SortMode)}>
-            <option value="created">Newest first</option>
-            <option value="dueDate">By due date</option>
-            <option value="priority">By priority</option>
+            <option value="created">{t('todos.sortCreated')}</option>
+            <option value="dueDate">{t('todos.sortDue')}</option>
+            <option value="priority">{t('todos.sortPriority')}</option>
           </select>
           <ChevronDown size={14} className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-ink-400" />
         </div>
         <div className="flex-1" />
         <button className={showDone ? 'btn-primary' : 'btn-ghost'} onClick={() => setShowDone(!showDone)}>
-          Completed ({doneCount})
+          {t('todos.completed', { n: doneCount })}
         </button>
       </div>
 
       <div className="mt-3 flex flex-col gap-0.5">
         {visible.length === 0 && (
           <div className="card mt-2 px-6 py-10 text-center text-sm text-ink-400">
-            {showDone ? 'Nothing completed yet — go finish something!' : 'All clear. Add a task above to get started.'}
+            {showDone ? t('todos.emptyDone') : t('todos.emptyOpen')}
           </div>
         )}
         {visible.map((task) => (

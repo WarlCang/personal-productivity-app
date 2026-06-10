@@ -1,13 +1,21 @@
 import { useState } from 'react'
 import { Flag, Play, Plus, Tag, Trash2, X } from 'lucide-react'
 import { useStore } from '../../store/useStore'
+import { useT, type TKey } from '../../i18n'
+import { PRESET_TAGS, tagChipClass } from '../../utils/torrasPresets'
 import type { Priority, Task } from '../../types'
 import { uid } from '../../utils/id'
 
-export const PRIORITY_STYLES: Record<Priority, { label: string; chip: string }> = {
-  high: { label: 'High', chip: 'bg-red-500/15 text-red-400' },
-  medium: { label: 'Medium', chip: 'bg-brand-500/15 text-brand-400' },
-  low: { label: 'Low', chip: 'bg-sky-500/15 text-sky-400' },
+export const PRIORITY_CHIP: Record<Priority, string> = {
+  high: 'bg-red-500/15 text-red-400',
+  medium: 'bg-brand-500/15 text-brand-400',
+  low: 'bg-sky-500/15 text-sky-400',
+}
+
+export const PRIORITY_KEY: Record<Priority, TKey> = {
+  high: 'task.priorityHigh',
+  medium: 'task.priorityMedium',
+  low: 'task.priorityLow',
 }
 
 export default function TaskModal({ taskId, onClose }: { taskId: string; onClose: () => void }) {
@@ -17,6 +25,7 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
   const toggleTaskDone = useStore((s) => s.toggleTaskDone)
   const startPomodoro = useStore((s) => s.startPomodoro)
   const setView = useStore((s) => s.setView)
+  const t = useT()
   const [newSubtask, setNewSubtask] = useState('')
   const [newTag, setNewTag] = useState('')
 
@@ -31,12 +40,14 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
     setNewSubtask('')
   }
 
-  const addTag = () => {
-    const tag = newTag.trim().toLowerCase()
+  const addTag = (raw?: string) => {
+    const tag = (raw ?? newTag).trim().toLowerCase()
     if (!tag || task.tags.includes(tag)) return setNewTag('')
     patch({ tags: [...task.tags, tag] })
     setNewTag('')
   }
+
+  const unusedPresets = PRESET_TAGS.filter((p) => !task.tags.includes(p.tag))
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -51,7 +62,7 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
           <input
             className="flex-1 bg-transparent text-lg font-semibold text-white outline-none placeholder-ink-400"
             value={task.title}
-            placeholder="Task title"
+            placeholder={t('task.titlePlaceholder')}
             onChange={(e) => patch({ title: e.target.value })}
           />
           <button className="btn-ghost -mr-1 px-2" onClick={onClose}>
@@ -61,14 +72,14 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
 
         <textarea
           className="input mt-3 min-h-20 resize-y"
-          placeholder="Description…"
+          placeholder={t('task.descriptionPlaceholder')}
           value={task.description ?? ''}
           onChange={(e) => patch({ description: e.target.value })}
         />
 
         <div className="mt-3 grid grid-cols-2 gap-3">
           <label className="text-xs text-ink-400">
-            Due date
+            {t('task.dueDate')}
             <input
               type="date"
               className="input mt-1 [color-scheme:dark]"
@@ -77,30 +88,30 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
             />
           </label>
           <label className="text-xs text-ink-400">
-            Priority
+            {t('task.priority')}
             <select
               className="input mt-1 cursor-pointer"
               value={task.priority ?? ''}
               onChange={(e) => patch({ priority: (e.target.value || undefined) as Priority | undefined })}
             >
-              <option value="">None</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
+              <option value="">{t('task.priorityNone')}</option>
+              <option value="high">{t('task.priorityHigh')}</option>
+              <option value="medium">{t('task.priorityMedium')}</option>
+              <option value="low">{t('task.priorityLow')}</option>
             </select>
           </label>
         </div>
 
         <div className="mt-4">
           <div className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-400">
-            <Tag size={12} /> Tags
+            <Tag size={12} /> {t('task.tags')}
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {task.tags.map((tag) => (
-              <span key={tag} className="chip bg-ink-800 text-ink-200">
+              <span key={tag} className={`chip ${tagChipClass(tag)}`}>
                 #{tag}
                 <button
-                  className="cursor-pointer text-ink-400 hover:text-red-400"
+                  className="cursor-pointer opacity-60 hover:text-red-400 hover:opacity-100"
                   onClick={() => patch({ tags: task.tags.filter((t) => t !== tag) })}
                 >
                   <X size={11} />
@@ -109,18 +120,31 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
             ))}
             <input
               className="w-28 rounded-full border border-ink-700 bg-transparent px-2.5 py-0.5 text-xs outline-none placeholder-ink-400 focus:border-brand-500"
-              placeholder="Add tag…"
+              placeholder={t('task.addTag')}
               value={newTag}
               onChange={(e) => setNewTag(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addTag()}
-              onBlur={addTag}
+              onBlur={() => addTag()}
             />
           </div>
+          {unusedPresets.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {unusedPresets.map((p) => (
+                <button
+                  key={p.tag}
+                  className={`chip cursor-pointer opacity-60 transition-opacity hover:opacity-100 ${p.chip}`}
+                  onClick={() => addTag(p.tag)}
+                >
+                  + {p.tag}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mt-4">
           <div className="mb-1.5 flex items-center gap-1.5 text-xs text-ink-400">
-            <Flag size={12} /> Subtasks
+            <Flag size={12} /> {t('task.subtasks')}
             {task.subtasks.length > 0 && (
               <span>
                 ({task.subtasks.filter((s) => s.done).length}/{task.subtasks.length})
@@ -155,7 +179,7 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
               <Plus size={14} className="text-ink-400" />
               <input
                 className="flex-1 bg-transparent py-1 text-sm outline-none placeholder-ink-400"
-                placeholder="Add subtask…"
+                placeholder={t('task.addSubtask')}
                 value={newSubtask}
                 onChange={(e) => setNewSubtask(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addSubtask()}
@@ -172,7 +196,7 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
               onClose()
             }}
           >
-            <Trash2 size={14} /> Delete
+            <Trash2 size={14} /> {t('task.delete')}
           </button>
           <button
             className="btn-primary"
@@ -182,7 +206,7 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
               onClose()
             }}
           >
-            <Play size={14} /> Focus on this
+            <Play size={14} /> {t('task.focusOnThis')}
           </button>
         </div>
       </div>

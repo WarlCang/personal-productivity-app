@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Gamepad2, Lock, Play, Timer } from 'lucide-react'
 import { useStore, useGameUnlocked } from '../../store/useStore'
+import { useT } from '../../i18n'
 import { playGameSound } from '../../utils/sound'
 
 const W = 480
@@ -95,6 +96,7 @@ export default function GameView() {
   const setView = useStore((s) => s.setView)
   const startPomodoro = useStore((s) => s.startPomodoro)
 
+  const t = useT()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stateRef = useRef<GameState>(newGame())
   const [status, setStatus] = useState<'idle' | 'playing' | 'over'>('idle')
@@ -244,17 +246,18 @@ export default function GameView() {
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-ink-700 bg-ink-900">
           <Lock size={26} className="text-ink-400" />
         </div>
-        <h1 className="text-2xl font-bold text-white">Drop Defense is locked</h1>
-        <p className="max-w-sm text-sm leading-relaxed text-ink-400">
-          The game unlocks during pomodoro breaks. Finish a focus session and come back here to defend some phones —
-          you've earned it.
-        </p>
+        <h1 className="text-2xl font-bold text-white">{t('game.lockedTitle')}</h1>
+        <p className="max-w-sm text-sm leading-relaxed text-ink-400">{t('game.lockedBody')}</p>
         <div className="flex gap-2">
           <button className="btn-primary" onClick={() => { startPomodoro(); setView('pomodoro') }}>
-            <Timer size={15} /> Start a focus session
+            <Timer size={15} /> {t('game.startFocus')}
           </button>
         </div>
-        {highScore > 0 && <p className="text-xs text-ink-500">High score: {highScore}</p>}
+        {highScore > 0 && (
+          <p className="text-xs text-ink-500">
+            {t('game.highScore')}: {highScore}
+          </p>
+        )}
       </div>
     )
   }
@@ -262,15 +265,13 @@ export default function GameView() {
   return (
     <div className="flex h-full flex-col items-center px-6 py-8">
       <div className="flex w-full max-w-[480px] items-baseline justify-between">
-        <h1 className="text-2xl font-bold text-white">Drop Defense</h1>
+        <h1 className="text-2xl font-bold text-white">{t('game.title')}</h1>
         <div className="text-xs text-ink-400">
-          Break ends in <span className="font-mono text-emerald-400">{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</span>
-          {' · '}High score <span className="text-brand-400">{highScore}</span>
+          {t('game.breakEndsIn')} <span className="font-mono text-emerald-400">{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</span>
+          {' · '}{t('game.highScore')} <span className="text-brand-400">{highScore}</span>
         </div>
       </div>
-      <p className="mt-1 w-full max-w-[480px] text-xs text-ink-400">
-        Phones are falling — catch them in your TORRAS case! Mouse or ←/→ to move. Golden phones are worth 50.
-      </p>
+      <p className="mt-1 w-full max-w-[480px] text-xs text-ink-400">{t('game.instructions')}</p>
 
       <div className="relative mt-4">
         <canvas
@@ -285,18 +286,18 @@ export default function GameView() {
             <Gamepad2 size={36} className="text-brand-500" />
             {status === 'over' ? (
               <>
-                <div className="text-2xl font-bold text-white">{phase === 'focus' ? "Break's over!" : 'Game over'}</div>
+                <div className="text-2xl font-bold text-white">{phase === 'focus' ? t('game.breakOver') : t('game.gameOver')}</div>
                 <div className="text-sm text-ink-300">
-                  Score: <span className="font-semibold text-brand-400">{finalScore}</span>
-                  {finalScore >= highScore && finalScore > 0 && ' · New high score! 🏆'}
+                  {t('game.score')}: <span className="font-semibold text-brand-400">{finalScore}</span>
+                  {finalScore >= highScore && finalScore > 0 && ` · ${t('game.newHighScore')}`}
                 </div>
               </>
             ) : (
-              <div className="text-lg font-semibold text-white">Ready to defend?</div>
+              <div className="text-lg font-semibold text-white">{t('game.ready')}</div>
             )}
             {unlocked && (
               <button className="btn-primary" onClick={start}>
-                <Play size={15} /> {status === 'over' ? 'Play again' : 'Start'}
+                <Play size={15} /> {status === 'over' ? t('game.playAgain') : t('game.start')}
               </button>
             )}
           </div>
