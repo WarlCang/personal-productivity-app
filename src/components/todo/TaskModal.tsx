@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { Flag, Play, Plus, Tag, Trash2, X } from 'lucide-react'
+import { Flag, Play, Plus, Settings2, Tag, Trash2, X } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { useT, type TKey } from '../../i18n'
 import { PRESET_TAGS, tagChipClass } from '../../utils/torrasPresets'
-import type { Priority, Task } from '../../types'
+import { checklistSubtasks } from '../../utils/channelChecklists'
+import type { Priority, RecurrenceFreq, Task } from '../../types'
 import { uid } from '../../utils/id'
+import ChecklistEditorModal from './ChecklistEditorModal'
 
 export const PRIORITY_CHIP: Record<Priority, string> = {
   high: 'bg-red-500/15 text-red-400',
@@ -25,9 +27,12 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
   const toggleTaskDone = useStore((s) => s.toggleTaskDone)
   const startPomodoro = useStore((s) => s.startPomodoro)
   const setView = useStore((s) => s.setView)
+  const language = useStore((s) => s.language)
+  const channelChecklists = useStore((s) => s.channelChecklists)
   const t = useT()
   const [newSubtask, setNewSubtask] = useState('')
   const [newTag, setNewTag] = useState('')
+  const [showChecklistEditor, setShowChecklistEditor] = useState(false)
 
   if (!task) return null
 
@@ -77,7 +82,7 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
           onChange={(e) => patch({ description: e.target.value })}
         />
 
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="mt-3 grid grid-cols-3 gap-3">
           <label className="text-xs text-ink-400">
             {t('task.dueDate')}
             <input
@@ -98,6 +103,22 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
               <option value="high">{t('task.priorityHigh')}</option>
               <option value="medium">{t('task.priorityMedium')}</option>
               <option value="low">{t('task.priorityLow')}</option>
+            </select>
+          </label>
+          <label className="text-xs text-ink-400" title={t('task.repeatsHint')}>
+            {t('event.repeats')}
+            <select
+              className="input mt-1 cursor-pointer"
+              value={task.recurrence ?? ''}
+              disabled={!task.dueDate}
+              onChange={(e) =>
+                patch({ recurrence: (e.target.value || undefined) as RecurrenceFreq | undefined })
+              }
+            >
+              <option value="">{t('event.never')}</option>
+              <option value="daily">{t('event.daily')}</option>
+              <option value="weekly">{t('event.weekly')}</option>
+              <option value="monthly">{t('event.monthly')}</option>
             </select>
           </label>
         </div>
@@ -150,6 +171,25 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
                 ({task.subtasks.filter((s) => s.done).length}/{task.subtasks.length})
               </span>
             )}
+          </div>
+          <div className="mb-2 flex flex-wrap items-center gap-1">
+            {channelChecklists.map((channel) => (
+              <button
+                key={channel.id}
+                title={t('task.channelHint')}
+                className={`chip cursor-pointer opacity-60 transition-opacity hover:opacity-100 ${channel.chip}`}
+                onClick={() => patch({ subtasks: [...task.subtasks, ...checklistSubtasks(channel, language)] })}
+              >
+                + {language === 'zh' ? channel.name.zh : channel.name.en}
+              </button>
+            ))}
+            <button
+              className="cursor-pointer p-1 text-ink-600 transition-colors hover:text-ink-200"
+              title={t('checklistEdit.title')}
+              onClick={() => setShowChecklistEditor(true)}
+            >
+              <Settings2 size={13} />
+            </button>
           </div>
           <div className="flex flex-col gap-1">
             {task.subtasks.map((sub) => (
@@ -209,6 +249,8 @@ export default function TaskModal({ taskId, onClose }: { taskId: string; onClose
             <Play size={14} /> {t('task.focusOnThis')}
           </button>
         </div>
+
+        {showChecklistEditor && <ChecklistEditorModal onClose={() => setShowChecklistEditor(false)} />}
       </div>
     </div>
   )

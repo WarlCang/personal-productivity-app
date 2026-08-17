@@ -6,8 +6,11 @@ import { useT, useDateLocale } from '../../i18n'
 import { getChinaDayInfo } from '../../utils/chinaWorkCalendar'
 import { occursOn } from '../../utils/recurrence'
 import { promoLabel, promosOn, upcomingPromos } from '../../utils/promoCalendar'
+import { usePromoPacks } from '../../store/useAuth'
 import { TaskRow } from '../todo/TodoView'
 import TaskModal from '../todo/TaskModal'
+import MarketClock from './MarketClock'
+import { localToEt } from '../../utils/timezones'
 
 export default function HomeView() {
   const tasks = useStore((s) => s.tasks)
@@ -58,8 +61,9 @@ export default function HomeView() {
   const todaySessions = sessions.filter((s) => s.date === todayKey)
   const todayMinutes = todaySessions.reduce((sum, s) => sum + s.minutes, 0)
   const openCount = tasks.filter((task) => !task.done).length
-  const todayPromos = promosOn(now)
-  const upcoming = upcomingPromos(now, 3)
+  const packs = usePromoPacks()
+  const todayPromos = promosOn(now, packs)
+  const upcoming = upcomingPromos(now, 3, packs)
 
   const quickAdd = () => {
     const title = quickTitle.trim()
@@ -74,6 +78,7 @@ export default function HomeView() {
         <h1 className="text-2xl font-bold text-white">{greeting}</h1>
         <span className="text-sm text-ink-400">{dateLabel}</span>
         <span className={`chip ${dayStatus.cls}`}>{dayStatus.text}</span>
+        {packs.includes('us') && <MarketClock />}
         {todayPromos.map((promo) => (
           <span key={promo.id} className="chip bg-purple-500/15 text-purple-300">
             {t('calendar.promoToday', { name: promoLabel(promo, language) })}
@@ -164,6 +169,11 @@ export default function HomeView() {
                   {event.startTime ?? '—'}
                   {event.endTime ? `–${event.endTime}` : ''}
                 </span>
+                {event.tz === 'us' && event.startTime && (
+                  <span className="shrink-0 text-[11px] text-sky-300">
+                    {localToEt(event.date, event.startTime).time} {localToEt(event.date, event.startTime).abbr}
+                  </span>
+                )}
                 <span className="min-w-0 flex-1 truncate text-sm text-ink-100">{event.title}</span>
               </button>
             ))}

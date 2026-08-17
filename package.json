@@ -1,13 +1,14 @@
 {
   "name": "torras-productivity",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.2.0",
   "description": "TORRAS personal productivity app: todos, kanban, calendar, notes, pomodoro, and a break-time game.",
   "author": "TORRAS",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
+    "dev:server": "npm --prefix server run dev",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "dist:mac": "npm run build && electron-builder --mac"

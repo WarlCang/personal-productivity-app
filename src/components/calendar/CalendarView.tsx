@@ -14,13 +14,15 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Plus, Repeat } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Globe, Plus, Repeat } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { useT, useDateLocale } from '../../i18n'
 import type { CalendarEvent, Task } from '../../types'
 import { occursOn } from '../../utils/recurrence'
 import { getChinaDayInfo, hasChinaCalendarData, isHolidayStart } from '../../utils/chinaWorkCalendar'
 import { promoLabel, promosOn, upcomingPromos, type PromoEvent } from '../../utils/promoCalendar'
+import { usePromoPacks } from '../../store/useAuth'
+import { localToEt } from '../../utils/timezones'
 import EventModal from './EventModal'
 import TaskModal from '../todo/TaskModal'
 
@@ -50,15 +52,18 @@ function useDayItems(days: Date[]): Map<string, DayItems> {
 }
 
 function EventPill({ event, onClick }: { event: CalendarEvent; onClick: () => void }) {
+  const et = event.tz === 'us' && event.startTime ? localToEt(event.date, event.startTime) : null
   return (
     <button
       onClick={(e) => {
         e.stopPropagation()
         onClick()
       }}
+      title={et ? `${et.time} ${et.abbr}` : undefined}
       className="flex w-full cursor-pointer items-center gap-1 truncate rounded bg-brand-500/15 px-1.5 py-0.5 text-left text-[11px] text-brand-300 transition-colors hover:bg-brand-500/25"
     >
       {event.startTime && <span className="shrink-0 font-medium">{event.startTime}</span>}
+      {et && <Globe size={9} className="shrink-0 text-sky-300" />}
       <span className="truncate">{event.title}</span>
       {event.recurrence && <Repeat size={9} className="shrink-0" />}
     </button>
@@ -157,7 +162,8 @@ export default function CalendarView() {
         ? `${format(startOfWeek(cursor), 'M月d日')} – ${format(endOfWeek(cursor), 'M月d日')}, ${format(cursor, 'yyyy')}`
         : `${format(startOfWeek(cursor), 'MMM d')} – ${format(endOfWeek(cursor), 'MMM d, yyyy')}`
 
-  const upcoming = upcomingPromos(new Date(), 2)
+  const packs = usePromoPacks()
+  const upcoming = upcomingPromos(new Date(), 2, packs)
 
   return (
     <div className="flex h-full flex-col px-6 py-8">
@@ -263,7 +269,7 @@ export default function CalendarView() {
                     <ChinaDayBadge day={day} />
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    {promosOn(day).map((promo) => (
+                    {promosOn(day, packs).map((promo) => (
                       <PromoPill key={promo.id} promo={promo} />
                     ))}
                     {events.slice(0, 3).map((ev) => (
@@ -303,7 +309,7 @@ export default function CalendarView() {
                 )}
                 {/* All-day row: tasks + untimed events */}
                 <div className="mt-1 flex flex-col gap-0.5">
-                  {promosOn(day).map((promo) => (
+                  {promosOn(day, packs).map((promo) => (
                     <PromoPill key={promo.id} promo={promo} />
                   ))}
                   {items
@@ -369,6 +375,11 @@ export default function CalendarView() {
                             {ev.startTime}
                             {ev.endTime ? `–${ev.endTime}` : ''}
                           </span>
+                          {ev.tz === 'us' && (
+                            <span className="ml-1 text-sky-300">
+                              {localToEt(ev.date, ev.startTime!).time} {localToEt(ev.date, ev.startTime!).abbr}
+                            </span>
+                          )}
                         </button>
                       )
                     })}

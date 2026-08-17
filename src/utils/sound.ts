@@ -5,6 +5,11 @@ function getCtx(): AudioContext {
   return ctx
 }
 
+/** Shared context so game music and effects mix in one place. */
+export function getAudioContext(): AudioContext {
+  return getCtx()
+}
+
 /** Short two-tone chime used when a pomodoro phase ends. */
 export function playChime() {
   try {

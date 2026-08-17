@@ -1,19 +1,25 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { format } from 'date-fns'
+import { addDays, addMonths, format, parseISO } from 'date-fns'
 import type {
   Board,
   CalendarEvent,
+  Campaign,
   Column,
+  DiscountCode,
   FocusSession,
   Note,
   PomodoroPhase,
   PomodoroSettings,
+  QuickLink,
   Task,
   ViewName,
 } from '../types'
 import { uid } from '../utils/id'
 import { playChime } from '../utils/sound'
+import { DEFAULT_PLAYBOOKS, type Playbook } from '../utils/playbooks'
+import { DEFAULT_CHANNEL_CHECKLISTS, type ChannelChecklist } from '../utils/channelChecklists'
+import type { VaultBlob } from '../utils/vaultCrypto'
 import { translate, type Lang } from '../i18n/dict'
 
 const MAIN_BOARD_ID = 'board-main'
@@ -24,6 +30,15 @@ const DEFAULT_COLUMNS: Column[] = [
   { id: 'col-todo', title: 'To Do', order: 0, boardId: MAIN_BOARD_ID },
   { id: 'col-progress', title: 'In Progress', order: 1, boardId: MAIN_BOARD_ID },
   { id: 'col-done', title: 'Done', order: 2, boardId: MAIN_BOARD_ID, isDoneColumn: true },
+]
+
+/** Starter set for the quick-links launcher; fully user-editable afterwards. */
+const DEFAULT_QUICK_LINKS: QuickLink[] = [
+  { id: 'ql-klaviyo', name: 'Klaviyo', url: 'https://www.klaviyo.com/login' },
+  { id: 'ql-gads', name: 'Google Ads', url: 'https://ads.google.com/' },
+  { id: 'ql-meta', name: 'Meta Ads Manager', url: 'https://adsmanager.facebook.com/' },
+  { id: 'ql-ga', name: 'Google Analytics', url: 'https://analytics.google.com/' },
+  { id: 'ql-gsc', name: 'Search Console', url: 'https://search.google.com/search-console' },
 ]
 
 const DEFAULT_POMODORO: PomodoroSettings = {
@@ -97,8 +112,66 @@ interface Store {
   resetPomodoro: () => void
   tick: () => void
 
+  /** Shopify store handle for admin deep links (admin.shopify.com/store/<handle>). */
+  shopifyStoreHandle: string
+  setShopifyStoreHandle: (handle: string) => void
+
+  /** Encrypted password vault blob — only ciphertext is ever persisted. */
+  vault: VaultBlob | null
+  setVault: (vault: VaultBlob | null) => void
+
+  /** Campaign playbook templates — seeded with defaults, fully user-editable. */
+  playbooks: Playbook[]
+  savePlaybook: (playbook: Playbook) => void
+  deletePlaybook: (id: string) => void
+  resetPlaybooks: () => void
+
+  /** Channel QA checklists — seeded with defaults, fully user-editable. */
+  channelChecklists: ChannelChecklist[]
+  saveChecklist: (checklist: ChannelChecklist) => void
+  deleteChecklist: (id: string) => void
+  resetChecklists: () => void
+
+  /** Campaigns instantiated from playbooks — what the campaign hub tracks. */
+  campaigns: Campaign[]
+  addCampaign: (partial: Omit<Campaign, 'id' | 'createdAt'>) => void
+  deleteCampaign: (id: string) => void
+
+  /** One-shot tag filter handoff: campaign hub sets it, TodoView consumes it. */
+  todosFilterTag: string | null
+  setTodosFilterTag: (tag: string | null) => void
+
+  /**
+   * Last task completion, undoable until the user moves elsewhere: cleared by
+   * undo, dismissal, a newer completion, or switching views.
+   */
+  undoState: {
+    taskId: string
+    title: string
+    prevColumnId: string
+    prevOrder: number
+    spawnedTaskId: string | null
+  } | null
+  undoComplete: () => void
+  clearUndo: () => void
+
+  quickLinks: QuickLink[]
+  addQuickLink: (name: string, url: string) => void
+  /** Appends links, skipping URLs already present. */
+  addQuickLinks: (links: { name: string; url: string }[]) => void
+  updateQuickLink: (id: string, patch: Partial<Omit<QuickLink, 'id'>>) => void
+  deleteQuickLink: (id: string) => void
+
+  discountCodes: DiscountCode[]
+  addDiscountCode: (partial: Omit<DiscountCode, 'id' | 'createdAt'>) => void
+  deleteDiscountCode: (id: string) => void
+
   gameHighScore: number
   setGameHighScore: (score: number) => void
+  frenzyHighScore: number
+  setFrenzyHighScore: (score: number) => void
+  gameMusicEnabled: boolean
+  setGameMusicEnabled: (enabled: boolean) => void
 
   /** When set, CalendarView jumps to this date and clears it. */
   calendarJumpDate: string | null
@@ -117,6 +190,33 @@ function notifyPhaseEnd(settings: PomodoroSettings, finished: PomodoroPhase, lan
   }
 }
 
+/** Successor task created when a recurring task is completed. */
+function nextOccurrence(task: Task, tasks: Task[], columns: Column[]): Task | null {
+  if (!task.recurrence || !task.dueDate) return null
+  const due = parseISO(task.dueDate)
+  const next =
+    task.recurrence === 'daily'
+      ? addDays(due, 1)
+      : task.recurrence === 'weekly'
+        ? addDays(due, 7)
+        : addMonths(due, 1)
+  const boardId = columns.find((c) => c.id === task.columnId)?.boardId
+  const boardCols = columns.filter((c) => c.boardId === boardId)
+  const firstCol = [...boardCols].sort((a, b) => a.order - b.order).find((c) => !c.isDoneColumn) ?? boardCols[0]
+  const columnId = firstCol?.id ?? task.columnId
+  return {
+    ...task,
+    id: uid(),
+    done: false,
+    completedAt: undefined,
+    createdAt: new Date().toISOString(),
+    dueDate: format(next, 'yyyy-MM-dd'),
+    subtasks: task.subtasks.map((s) => ({ ...s, id: uid(), done: false })),
+    columnId,
+    order: Math.max(-1, ...tasks.filter((t) => t.columnId === columnId).map((t) => t.order)) + 1,
+  }
+}
+
 function phaseSeconds(settings: PomodoroSettings, phase: PomodoroPhase): number {
   const minutes =
     phase === 'focus'
@@ -131,7 +231,8 @@ export const useStore = create<Store>()(
   persist(
     (set, get) => ({
       view: 'todos',
-      setView: (view) => set({ view }),
+      // Navigating away is the "moved elsewhere" signal that retires the undo toast.
+      setView: (view) => set({ view, undoState: null }),
       language: 'en',
       setLanguage: (language) => set({ language }),
 
@@ -215,32 +316,69 @@ export const useStore = create<Store>()(
         const doneCol = boardCols.find((c) => c.isDoneColumn)
         const firstCol = [...boardCols].sort((a, b) => a.order - b.order).find((c) => !c.isDoneColumn)
         let columnId = task.columnId
-        if (done && doneCol) columnId = doneCol.id
-        else if (!done && doneCol && task.columnId === doneCol.id && firstCol) columnId = firstCol.id
+        let prevColumnId = task.prevColumnId
+        if (done && doneCol) {
+          prevColumnId = task.columnId
+          columnId = doneCol.id
+        } else if (!done && doneCol && task.columnId === doneCol.id) {
+          // Restore the pre-completion column when it still exists.
+          const restored = boardCols.find((c) => c.id === task.prevColumnId) ?? firstCol
+          if (restored) columnId = restored.id
+          prevColumnId = undefined
+        }
+        const updated = tasks.map((t) =>
+          t.id === id
+            ? { ...t, done, completedAt: done ? new Date().toISOString() : undefined, columnId, prevColumnId }
+            : t,
+        )
+        const successor = done ? nextOccurrence(task, tasks, columns) : null
         set({
-          tasks: tasks.map((t) =>
-            t.id === id
-              ? { ...t, done, completedAt: done ? new Date().toISOString() : undefined, columnId }
-              : t,
-          ),
+          tasks: successor ? [...updated, successor] : updated,
+          undoState: done
+            ? {
+                taskId: task.id,
+                title: task.title,
+                prevColumnId: task.columnId,
+                prevOrder: task.order,
+                spawnedTaskId: successor?.id ?? null,
+              }
+            : null,
         })
       },
 
       moveTask: (id, columnId, order) => {
         const { tasks, columns } = get()
         const doneCol = columns.find((c) => c.isDoneColumn)
+        const task = tasks.find((t) => t.id === id)
+        const becameDone = !!task && !task.done && !!doneCol && columnId === doneCol.id
+        const updated = tasks.map((t) => {
+          if (t.id !== id) return t
+          const done = doneCol ? columnId === doneCol.id : t.done
+          return {
+            ...t,
+            columnId,
+            order,
+            done,
+            completedAt: done ? (t.completedAt ?? new Date().toISOString()) : undefined,
+            // A drag into Done remembers where the card came from; any other
+            // manual move makes the current position the truth.
+            prevColumnId: becameDone ? t.columnId : undefined,
+          }
+        })
+        const successor = becameDone && task ? nextOccurrence(task, tasks, columns) : null
         set({
-          tasks: tasks.map((t) => {
-            if (t.id !== id) return t
-            const done = doneCol ? columnId === doneCol.id : t.done
-            return {
-              ...t,
-              columnId,
-              order,
-              done,
-              completedAt: done ? (t.completedAt ?? new Date().toISOString()) : undefined,
-            }
-          }),
+          tasks: successor ? [...updated, successor] : updated,
+          ...(becameDone && task
+            ? {
+                undoState: {
+                  taskId: task.id,
+                  title: task.title,
+                  prevColumnId: task.columnId,
+                  prevOrder: task.order,
+                  spawnedTaskId: successor?.id ?? null,
+                },
+              }
+            : {}),
         })
       },
 
@@ -437,8 +575,111 @@ export const useStore = create<Store>()(
         }
       },
 
+      shopifyStoreHandle: '',
+      setShopifyStoreHandle: (handle) => set({ shopifyStoreHandle: handle.trim() }),
+
+      vault: null,
+      setVault: (vault) => set({ vault }),
+
+      playbooks: DEFAULT_PLAYBOOKS,
+      savePlaybook: (playbook) => {
+        const { playbooks } = get()
+        const exists = playbooks.some((p) => p.id === playbook.id)
+        set({
+          playbooks: exists
+            ? playbooks.map((p) => (p.id === playbook.id ? playbook : p))
+            : [...playbooks, playbook],
+        })
+      },
+      deletePlaybook: (id) => set({ playbooks: get().playbooks.filter((p) => p.id !== id) }),
+      resetPlaybooks: () => set({ playbooks: DEFAULT_PLAYBOOKS }),
+
+      channelChecklists: DEFAULT_CHANNEL_CHECKLISTS,
+      saveChecklist: (checklist) => {
+        const { channelChecklists } = get()
+        const exists = channelChecklists.some((c) => c.id === checklist.id)
+        set({
+          channelChecklists: exists
+            ? channelChecklists.map((c) => (c.id === checklist.id ? checklist : c))
+            : [...channelChecklists, checklist],
+        })
+      },
+      deleteChecklist: (id) =>
+        set({ channelChecklists: get().channelChecklists.filter((c) => c.id !== id) }),
+      resetChecklists: () => set({ channelChecklists: DEFAULT_CHANNEL_CHECKLISTS }),
+
+      campaigns: [],
+      addCampaign: (partial) => {
+        const { campaigns } = get()
+        const existing = campaigns.find((c) => c.tag === partial.tag)
+        // Re-instantiating the same playbook/year updates the campaign record.
+        set({
+          campaigns: existing
+            ? campaigns.map((c) => (c.tag === partial.tag ? { ...c, ...partial } : c))
+            : [...campaigns, { ...partial, id: uid(), createdAt: new Date().toISOString() }],
+        })
+      },
+      deleteCampaign: (id) => set({ campaigns: get().campaigns.filter((c) => c.id !== id) }),
+
+      todosFilterTag: null,
+      setTodosFilterTag: (tag) => set({ todosFilterTag: tag }),
+
+      undoState: null,
+      undoComplete: () => {
+        const { undoState, tasks, columns } = get()
+        if (!undoState) return
+        const withoutSpawned = undoState.spawnedTaskId
+          ? tasks.filter((t) => t.id !== undoState.spawnedTaskId)
+          : tasks
+        const columnExists = columns.some((c) => c.id === undoState.prevColumnId)
+        set({
+          tasks: withoutSpawned.map((t) =>
+            t.id === undoState.taskId
+              ? {
+                  ...t,
+                  done: false,
+                  completedAt: undefined,
+                  prevColumnId: undefined,
+                  ...(columnExists
+                    ? { columnId: undoState.prevColumnId, order: undoState.prevOrder }
+                    : {}),
+                }
+              : t,
+          ),
+          undoState: null,
+        })
+      },
+      clearUndo: () => set({ undoState: null }),
+
+      quickLinks: DEFAULT_QUICK_LINKS,
+      addQuickLink: (name, url) =>
+        set({ quickLinks: [...get().quickLinks, { id: uid(), name, url }] }),
+      addQuickLinks: (links) => {
+        const existing = new Set(get().quickLinks.map((l) => l.url))
+        const fresh = links.filter((l) => !existing.has(l.url))
+        set({ quickLinks: [...get().quickLinks, ...fresh.map((l) => ({ ...l, id: uid() }))] })
+      },
+      updateQuickLink: (id, patch) =>
+        set({ quickLinks: get().quickLinks.map((l) => (l.id === id ? { ...l, ...patch } : l)) }),
+      deleteQuickLink: (id) => set({ quickLinks: get().quickLinks.filter((l) => l.id !== id) }),
+
+      discountCodes: [],
+      addDiscountCode: (partial) =>
+        set({
+          discountCodes: [
+            { ...partial, id: uid(), createdAt: new Date().toISOString() },
+            ...get().discountCodes,
+          ],
+        }),
+      deleteDiscountCode: (id) =>
+        set({ discountCodes: get().discountCodes.filter((c) => c.id !== id) }),
+
       gameHighScore: 0,
       setGameHighScore: (score) => set({ gameHighScore: Math.max(score, get().gameHighScore) }),
+      frenzyHighScore: 0,
+      setFrenzyHighScore: (score) => set({ frenzyHighScore: Math.max(score, get().frenzyHighScore) }),
+      gameMusicEnabled: true,
+      setGameMusicEnabled: (enabled) => set({ gameMusicEnabled: enabled }),
 
       calendarJumpDate: null,
       setCalendarJumpDate: (date) => set({ calendarJumpDate: date }),
@@ -449,6 +690,8 @@ export const useStore = create<Store>()(
     {
       name: 'torras-productivity',
       version: 2,
+      // Session-only state must not survive a reload.
+      partialize: (state) => ({ ...state, undoState: null, todosFilterTag: null }),
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>
         if (version < 2) {

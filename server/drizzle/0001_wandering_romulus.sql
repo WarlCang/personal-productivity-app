@@ -1,0 +1,1 @@
+ALTER TABLE "groups" ADD COLUMN "promo_pack" text DEFAULT 'cn' NOT NULL;

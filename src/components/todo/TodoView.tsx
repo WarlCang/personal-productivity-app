@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { format, isPast, isToday, parseISO } from 'date-fns'
-import { CalendarDays, ChevronDown, ListChecks, Plus } from 'lucide-react'
+import { CalendarDays, ChevronDown, ListChecks, Plus, Repeat, Rocket } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { useT } from '../../i18n'
 import { tagChipClass } from '../../utils/torrasPresets'
 import type { Task } from '../../types'
 import TaskModal, { PRIORITY_CHIP, PRIORITY_KEY } from './TaskModal'
+import PlaybookModal from './PlaybookModal'
 
 type SortMode = 'created' | 'dueDate' | 'priority'
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 }
@@ -57,6 +58,7 @@ export function TaskRow({ task, onOpen }: { task: Task; onOpen: () => void }) {
           #{tag}
         </span>
       ))}
+      {task.recurrence && <Repeat size={12} className="shrink-0 text-ink-400" />}
       {task.priority && <span className={`chip ${PRIORITY_CHIP[task.priority]}`}>{t(PRIORITY_KEY[task.priority])}</span>}
       <DueChip task={task} />
     </div>
@@ -72,6 +74,17 @@ export default function TodoView() {
   const [tagFilter, setTagFilter] = useState<string>('')
   const [sort, setSort] = useState<SortMode>('created')
   const [showDone, setShowDone] = useState(false)
+  const [showPlaybook, setShowPlaybook] = useState(false)
+
+  // One-shot tag filter handoff from the campaign hub.
+  const requestedTag = useStore((s) => s.todosFilterTag)
+  const setTodosFilterTag = useStore((s) => s.setTodosFilterTag)
+  useEffect(() => {
+    if (requestedTag) {
+      setTagFilter(requestedTag)
+      setTodosFilterTag(null)
+    }
+  }, [requestedTag, setTodosFilterTag])
 
   const allTags = useMemo(() => [...new Set(tasks.flatMap((t) => t.tags))].sort(), [tasks])
 
@@ -138,6 +151,9 @@ export default function TodoView() {
           <ChevronDown size={14} className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-ink-400" />
         </div>
         <div className="flex-1" />
+        <button className="btn-ghost" onClick={() => setShowPlaybook(true)}>
+          <Rocket size={14} /> {t('playbook.button')}
+        </button>
         <button className={showDone ? 'btn-primary' : 'btn-ghost'} onClick={() => setShowDone(!showDone)}>
           {t('todos.completed', { n: doneCount })}
         </button>
@@ -155,6 +171,7 @@ export default function TodoView() {
       </div>
 
       {openTaskId && <TaskModal taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
+      {showPlaybook && <PlaybookModal onClose={() => setShowPlaybook(false)} />}
     </div>
   )
 }
